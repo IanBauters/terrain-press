@@ -367,8 +367,19 @@
     }
     return TAB_UNIT;
   }
-  // put a tab in the middle of a polyline; s = tab scale in mm, dir = +1/-1 side
-  function tabOnPolyline(pts, s, dir, r) {
+  // put a tab near the middle of a polyline; s = tab scale in mm, dir = +1/-1 side.
+  // ang0 / ang1: the sharpest corner angle (degrees) a piece has at that end of the edge. Near a sharp corner the
+  // knob is moved away and, if needed, made smaller, so the tip stays at least MIN_WALL thick even with a
+  // socket on the neighbouring edge as well.
+  const MIN_WALL = 2.8;
+  // room a socket needs from a tip of angle A: between this socket and the other edge there must be the wall plus a
+  // possible socket from that edge; a point x along this edge is x * sin(A) from the other edge.
+  // (0.42 q covers the round bulb plus the printing clearance; the other edge's knob can be a little larger too)
+  const tipRoom = (q, A, L) => A < 88 ? (MIN_WALL + 0.3 + 0.42 * q) / Math.sin(A * Math.PI / 180) : 0.05 * L;
+  // how much spare length a socket of scale q has on an edge of length L whose socket piece has these end angles
+  const tabSlack = (L, q, A0, A1) => L - tipRoom(q, A0, L) - tipRoom(q, A1, L) - 0.34 * q;
+  let tabMayDrop = true;
+  function tabOnPolyline(pts, s, dir, r, ang0 = 90, ang1 = 90) {
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
     const L = cum[cum.length - 1];
@@ -378,7 +389,16 @@
       const tx = (b[0] - a[0]) / seg, ty = (b[1] - a[1]) / seg;
       return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, -ty, tx];
     };
-    const mid = L / 2 + (r() - 0.5) * 0.08 * L, u0 = mid - 0.14 * s, u1 = mid + 0.14 * s;
+    let mid = L / 2 + (r() - 0.5) * 0.08 * L;
+    if (tabMayDrop && (ang0 < 88 || ang1 < 88)) {
+      for (let i = 0; i < 9; i++) {
+        const lo = tipRoom(s, ang0, L) + 0.17 * s, hi = L - tipRoom(s, ang1, L) - 0.17 * s;
+        if (lo <= hi) { mid = Math.min(hi, Math.max(lo, mid)); break; }
+        if (i === 8) return pts; // no safe spot on this short edge: leave it straight, the piece locks through its other edges
+        s *= 0.88; // edge too short for a full-size knob this close to a sharp corner
+      }
+    }
+    const u0 = mid - 0.14 * s, u1 = mid + 0.14 * s;
     const out = [];
     for (let i = 0; i < pts.length; i++) if (cum[i] < u0) out.push(pts[i]);
     for (const [tu, tv] of tabTemplate()) {
@@ -388,8 +408,45 @@
     for (let i = 0; i < pts.length; i++) if (cum[i] > u1) out.push(pts[i]);
     return out;
   }
-  function radialCells(kind, W, across, seed) {
+  // Strength check for a cut layout: a sharp corner of a piece must not hang on material thinner than `wall`.
+  // Shrinking the piece by wall/2 splits such a tip off from the main body; count how many tips that happens to.
+  function weakTips(pts, wall) {
+    const inside = (R, x, y) => { let c = false; for (let i = 0, j = R.length - 1; i < R.length; j = i++) { const A = R[i], B = R[j]; if ((A[1] > y) !== (B[1] > y) && x < (B[0] - A[0]) * (y - A[1]) / (B[1] - A[1]) + A[0]) c = !c; } return c; };
+    const area = R => { let t = 0; for (let i = 0, j = R.length - 1; i < R.length; j = i++) t += R[j][0] * R[i][1] - R[i][0] * R[j][1]; return t / 2; };
+    const parts = offset([pts], -wall / 2, 'round').filter(q => Math.abs(area(q)) > 0.05).sort((x, y) => Math.abs(area(y)) - Math.abs(area(x)));
+    if (!parts.length) return 0;
+    const main = parts[0], n = pts.length; let weak = 0;
+    for (let i = 0; i < n; i++) {
+      const P = pts[(i - 1 + n) % n], V = pts[i], Q = pts[(i + 1) % n];
+      const ax = P[0] - V[0], ay = P[1] - V[1], bx = Q[0] - V[0], by = Q[1] - V[1], la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if (la < 1.5 || lb < 1.5) continue; // corners of the cut layout sit between long straight edges
+      const th = Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / la / lb)));
+      if (th > 85 * Math.PI / 180) continue;
+      const ux = ax / la + bx / lb, uy = ay / la + by / lb, ul = Math.hypot(ux, uy), d = (wall / 2 + 0.3) / Math.sin(th / 2);
+      const X = V[0] + ux / ul * d, Y = V[1] + uy / ul * d;
+      if (!inside(pts, X, Y)) continue; // reflex corner
+      if (!inside(main, X, Y) && parts.slice(1).some(q => inside(q, X, Y))) weak++;
+    }
+    return weak;
+  }
+  // Try a few knob arrangements and keep the first (or strongest) one without weak tips.
+  function radialCells(kind, W, across, seed, gapMm = 0.3) {
+    let best = null;
+    for (let t = 0; t < 8; t++) {
+      const jc = radialCellsOnce(kind, W, across, seed + t * 7919);
+      const clip = [shapeOutline(kind === 'circle' ? 'circle' : 'hexagon', W)];
+      let weak = 0;
+      for (const c of jc.cells) for (const e of boolOp(CL.ClipType.ctIntersection, [c.pts], clip)) weak += weakTips(e.outer, MIN_WALL + gapMm);
+      if (!best || weak < best.weak) best = { jc, weak };
+      if (!weak) break;
+    }
+    return best.jc;
+  }
+  function radialCellsOnce(kind, W, across, seed) {
     const a = W / across, r = rng(seed);
+    // pieces under ~6 mm are too small to keep every tip 2.8 mm strong; there the knobs stay where they always were,
+    // since dropping or shrinking them could leave a piece with nothing holding it
+    tabMayDrop = a >= 5.8;
     const isHex = kind === 'hex';
     // C(rho, phi): point on the ring of size rho at perimeter fraction phi (0..1, ccw from +x)
     const V = isHex ? [...Array(7)].map((_, i) => [Math.cos(i * Math.PI / 3), Math.sin(i * Math.PI / 3)]) : null;
@@ -398,6 +455,15 @@
       if (!isHex) return [rho * Math.cos(phi * 2 * Math.PI), rho * Math.sin(phi * 2 * Math.PI)];
       const f = phi * 6, s = Math.min(5, Math.floor(f)), t = f - s;
       return [rho * (V[s][0] * (1 - t) + V[s + 1][0] * t), rho * (V[s][1] * (1 - t) + V[s + 1][1] * t)];
+    };
+    // sharpest angle between a radial cut and the ring it meets, at perimeter fraction phi (hexagon corners: 60)
+    const cutAngle = phi => {
+      if (!isHex) return 90;
+      const f = (((phi % 1) + 1) % 1) * 6, sd = Math.floor(f + 1e-9) % 6;
+      if (Math.abs(f - Math.round(f)) < 1e-6) return 60;
+      const P = C(1, phi), T = [V[sd + 1][0] - V[sd][0], V[sd + 1][1] - V[sd][1]];
+      const c = Math.abs(P[0] * T[0] + P[1] * T[1]) / (Math.hypot(...P) * Math.hypot(...T));
+      return Math.acos(Math.min(1, c)) * 180 / Math.PI;
     };
     const thick = isHex ? a / Math.cos(Math.PI / 6) : a;          // ring thickness along the size axis
     const Rout = W / 2 + 1.5;                                       // beyond the outline; clipping makes the edge
@@ -450,8 +516,30 @@
         let pts = ringPts(k, p0, p1);
         const L = polyLen(pts);
         const cap = Math.min(k === 1 ? rho1 * 1.1 : t, t) * 0.95;
-        // ring edges run ccw, so dir -1 pushes the knob outward; the centre piece always gets outward knobs
-        if (k === 1 ? L > a * 0.3 : L > a * 0.6) pts = tabOnPolyline(pts, Math.min(L * 0.9, cap), k === 1 ? -1 : (r() < 0.5 ? 1 : -1), r);
+        // Corner angles of the two pieces this edge separates, at each end. The piece inside (ring k-1) has a corner
+        // where a cut from ring k-1 ends here; the piece outside (ring k) where a cut of ring k starts here.
+        const Rd = q => { const l = Math.hypot(q[0], q[1]) || 1; return [q[0] / l, q[1] / l]; };
+        const dirAt = (u, v) => Rd([v[0] - u[0], v[1] - u[1]]);
+        const T0 = dirAt(pts[0], pts[1]), T1 = dirAt(pts[pts.length - 2], pts[pts.length - 1]);
+        const R0 = Rd(pts[0]), R1 = Rd(pts[pts.length - 1]);
+        const ang = (u, v) => Math.acos(Math.max(-1, Math.min(1, u[0] * v[0] + u[1] * v[1]))) * 180 / Math.PI;
+        const has = (list, q) => !!list && list.some(v => Math.abs(((v - q) % 1 + 1.5) % 1 - 0.5) < 1e-6);
+        const corner = q => isHex && Math.abs(q * 6 - Math.round(q * 6)) < 1e-6;
+        const q1 = p1 % 1;
+        // centre piece (k = 1): its only corners are the hexagon's own 120 degree corners
+        const in0 = k === 1 ? (corner(p0) ? 120 : 180) : has(B[k - 1], p0) ? ang([-R0[0], -R0[1]], T0) : 180;
+        const in1 = k === 1 ? (corner(q1) ? 120 : 180) : has(B[k - 1], q1) ? ang([-R1[0], -R1[1]], [-T1[0], -T1[1]]) : 180;
+        const out0 = has(B[k], p0) ? ang(R0, T0) : 180, out1 = has(B[k], q1) ? ang(R1, [-T1[0], -T1[1]]) : 180;
+        // the sharper piece gets the knob (it adds material to the tip); the blunter one takes the socket.
+        // ring edges run ccw, so dir -1 pushes the knob outward (inside piece owns it); the centre always gets knobs.
+        const inSharp = Math.min(in0, in1), outSharp = Math.min(out0, out1), sz = Math.min(L * 0.9, cap);
+        let dir = k === 1 ? -1 : Math.abs(inSharp - outSharp) > 3 ? (inSharp < outSharp ? -1 : 1) : (r() < 0.5 ? 1 : -1);
+        if (k > 1) { // if the socket doesn't fit safely on the preferred side but does (better) on the other, swap
+          const slack = d => d === -1 ? tabSlack(L, sz, out0, out1) : tabSlack(L, sz, in0, in1);
+          if (slack(dir) < 0 && slack(-dir) > slack(dir)) dir = -dir;
+        }
+        const sock0 = dir === -1 ? out0 : in0, sock1 = dir === -1 ? out1 : in1; // corners of the piece with the socket
+        if (k === 1 ? L > a * 0.3 : L > a * 0.6) pts = tabOnPolyline(pts, Math.min(L * 0.9, cap), dir, r, sock0, sock1);
         ringEdge.set(k + ':' + i, pts);
       }
     }
@@ -462,7 +550,20 @@
       let pts = [C(rho[k], p), C(end, p)];
       const L = end - rho[k];
       const seg = isHex ? a : 2 * Math.PI * (rho[k] + end) / 2 / B[k].length;
-      if (L > a * 0.45) pts = tabOnPolyline(pts, Math.min(L, seg) * 0.8, r() < 0.5 ? 1 : -1, r);
+      // Corner angles at both ends of the cut, for the piece on each side. A cut to a hexagon corner gives both pieces
+      // 120 degrees inside and 60 outside; a slanted cut gives one piece alpha / 180-alpha and the other the reverse.
+      const Rr = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]], lr = Math.hypot(...Rr), Ru = [Rr[0] / lr, Rr[1] / lr];
+      const Tq = (() => { const e = 1e-5, A = C(rho[k], p - e), Bq = C(rho[k], p + e), l = Math.hypot(Bq[0] - A[0], Bq[1] - A[1]); return [(Bq[0] - A[0]) / l, (Bq[1] - A[1]) / l]; })();
+      const isCorner = isHex && Math.abs(p * 6 - Math.round(p * 6)) < 1e-6;
+      const alpha = isCorner ? 120 : Math.acos(Math.max(-1, Math.min(1, Ru[0] * Tq[0] + Ru[1] * Tq[1]))) * 180 / Math.PI;
+      const right = isCorner ? [120, 60] : [alpha, 180 - alpha], left = isCorner ? [120, 60] : [180 - alpha, alpha];
+      // dir +1 puts the knob on the left piece (socket on the right one): random, unless only one side fits safely
+      const sz = Math.min(L, seg) * 0.8;
+      let dir = r() < 0.5 ? 1 : -1;
+      const slack = d => d === 1 ? tabSlack(L, sz, right[0], right[1]) : tabSlack(L, sz, left[0], left[1]);
+      if (slack(dir) < 0 && slack(-dir) > slack(dir)) dir = -dir;
+      const sock = dir === 1 ? right : left;
+      if (L > a * 0.45) pts = tabOnPolyline(pts, sz, dir, r, sock[0], sock[1]);
       if (outer) pts.push(C(rho[K] + 2, p));
       radEdge.set(k + ':' + p.toFixed(9), pts);
     }
@@ -582,7 +683,7 @@
     const terrain = [];
     if (p.product === 'puzzle') {
       const inner = offset([outline], -p.gapMm / 2, join);
-      const jc = p.shape === 'square' ? jigsawCells(W, H, p.pieces, p.seed) : radialCells(p.shape === 'circle' ? 'circle' : 'hex', W, p.pieces, p.seed), { cells, cellArea } = jc;
+      const jc = p.shape === 'square' ? jigsawCells(W, H, p.pieces, p.seed) : radialCells(p.shape === 'circle' ? 'circle' : 'hex', W, p.pieces, p.seed, p.gapMm), { cells, cellArea } = jc;
       grid = jc;
       let pieces = [];
       for (const c of cells) for (const e of boolOp(CL.ClipType.ctIntersection, [c.pts], inner)) pieces.push({ ex: e, a: exArea(e), cell: c });
