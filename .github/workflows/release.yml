@@ -24,20 +24,22 @@ jobs:
           version = head.split('·')[0].strip()
           # first "**...**" line of the entry becomes the release title
           m = re.search(r'\*\*(.+?)\*\*', body)
-          title = f"{version} · {m.group(1).rstrip('.')}" if m else version
+          kind = re.search(r'^### (\w+)', body, flags=re.M)
+          label = {'Fixed': 'Fixed: ', 'Added': 'New: ', 'Changed': 'Changed: '}.get(kind.group(1) if kind else '', '')
+          title = f"{version} · {label}{m.group(1).rstrip('.')}" if m else version
           body = body.strip() + '\n\nFull history: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)'
           open('release-notes.md', 'w', encoding='utf-8').write(body)
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"version={version}\ntitle={title}\n")
           PY
-      - name: Publish the release (once per version)
+      - name: Publish the release (or update its notes)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.notes.outputs.version }}
           TITLE: ${{ steps.notes.outputs.title }}
         run: |
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "Release v$VERSION already exists"
+            gh release edit "v$VERSION" --title "$TITLE" --notes-file release-notes.md   # keep notes in sync with the changelog
           else
             gh release create "v$VERSION" --target "$GITHUB_SHA" --title "$TITLE" --notes-file release-notes.md
           fi
