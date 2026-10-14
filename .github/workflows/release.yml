@@ -1,0 +1,43 @@
+name: Publish release notes
+# When a new version is added at the top of CHANGELOG.md, publish it as a GitHub release
+# with that changelog entry as the notes.
+on:
+  push:
+    branches: [main]
+    paths: ['CHANGELOG.md', '.github/workflows/release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the newest changelog entry
+        id: notes
+        run: |
+          python3 - <<'PY'
+          import os, re
+          text = open('CHANGELOG.md', encoding='utf-8').read()
+          parts = re.split(r'^## ', text, flags=re.M)[1:]
+          head, _, body = parts[0].partition('\n')
+          version = head.split('·')[0].strip()
+          # first "**...**" line of the entry becomes the release title
+          m = re.search(r'\*\*(.+?)\*\*', body)
+          title = f"{version} · {m.group(1).rstrip('.')}" if m else version
+          body = body.strip() + '\n\nFull history: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)'
+          open('release-notes.md', 'w', encoding='utf-8').write(body)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"version={version}\ntitle={title}\n")
+          PY
+      - name: Publish the release (once per version)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.notes.outputs.version }}
+          TITLE: ${{ steps.notes.outputs.title }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists"
+          else
+            gh release create "v$VERSION" --target "$GITHUB_SHA" --title "$TITLE" --notes-file release-notes.md
+          fi

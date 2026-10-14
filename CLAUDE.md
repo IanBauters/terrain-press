@@ -10,7 +10,7 @@ For every change pushed to `main`:
    - Fixes: name the bug as a user would notice it (what went wrong, in which situation), then say it is fixed.
    - Mention anything the user must do, for example reprinting a puzzle.
    - No code, function names or internals.
-2. **Publish a GitHub release for the same version.** Tag it `vX.Y.Z`, give it a short title naming the change, and use the changelog entry as the release notes.
+2. **The GitHub release is published automatically.** The `release.yml` workflow publishes the newest changelog entry as release `vX.Y.Z` when `CHANGELOG.md` reaches `main`. It titles the release after the first bold line of the entry, so start each entry with a bold, plain-language summary.
 3. **Keep commit messages short and readable.** The technical explanation can follow in the commit body.
 
 Versioning: bug fixes bump the last number (1.0.0 → 1.0.1), new features the middle one (1.0.1 → 1.1.0).
