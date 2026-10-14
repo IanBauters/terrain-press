@@ -6,6 +6,8 @@ Pick a place on the Moon, Mars, Mercury, Ceres, Vesta, Venus or Pluto, choose a 
 
 **Use it now:** <https://ianbauters.github.io/terrain-press/>
 
+**What's new:** see the [changelog](CHANGELOG.md) or the [releases](https://github.com/IanBauters/terrain-press/releases).
+
 ## Why this exists
 
 There are services that charge per download for exactly this kind of file. The elevation data behind them is public domain, paid for by taxpayers and published by NASA, the USGS and their partners for anyone to use. Terrain Press is a free alternative: the tool itself is open source, and so is every file it makes.
