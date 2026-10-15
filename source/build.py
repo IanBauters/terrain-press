@@ -9,7 +9,8 @@ What it does:
   * trims Bootstrap to the classes the page uses (PurgeCSS) and inlines it
   * inlines app.js into the page and stamps a build hash, so browsers never run stale code
   * copies core.js and worker.js, pointing them at the bundled libraries in site/lib/
-  * copies three.js, OrbitControls, poly2tri and Clipper into site/lib/
+  * copies guide.js (the print guide, loaded when someone downloads)
+  * copies three.js, OrbitControls, poly2tri, Clipper and jsPDF into site/lib/
 
 Elevation data in site/data/ is not touched; see docs/DATA.md for how it was made.
 """
@@ -25,6 +26,7 @@ LIBS = {
     'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js': ('lib/OrbitControls.js', 'three/examples/js/controls/OrbitControls.js'),
     'https://cdn.jsdelivr.net/npm/poly2tri@1.5.0/dist/poly2tri.min.js': ('lib/poly2tri.min.js', 'poly2tri/dist/poly2tri.min.js'),
     'https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js': ('lib/clipper.js', 'clipper-lib/clipper.js'),
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js': ('lib/jspdf.umd.min.js', 'jspdf/dist/jspdf.umd.min.js'),
 }
 def localise(text):
     for url, (local, _) in LIBS.items(): text = text.replace(url, local)
@@ -33,7 +35,7 @@ def localise(text):
 if not os.path.isdir(NM): sys.exit('Run "npm install" in the repository root first.')
 
 core, worker = read(SRC, 'core.js'), read(SRC, 'worker.js')
-version = hashlib.sha1((worker + core + read(SITE, 'data', 'meta.json')).encode()).hexdigest()[:10]
+version = hashlib.sha1((worker + core + read(SRC, 'guide.js') + read(SITE, 'data', 'meta.json')).encode()).hexdigest()[:10]
 
 app = read(SRC, 'app.js').replace('__BUILD__', version)
 for key in ('MOON', 'MARS', 'MERCURY'):
@@ -61,6 +63,7 @@ html = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
 open(os.path.join(SITE, 'index.html'), 'w', encoding='utf-8').write(html)
 open(os.path.join(SITE, 'core.js'), 'w', encoding='utf-8').write(core)
 open(os.path.join(SITE, 'worker.js'), 'w', encoding='utf-8').write(localise(worker))
+open(os.path.join(SITE, 'guide.js'), 'w', encoding='utf-8').write(read(SRC, 'guide.js'))
 os.makedirs(os.path.join(SITE, 'lib'), exist_ok=True)
 for local, pkg in LIBS.values(): shutil.copy(os.path.join(NM, pkg), os.path.join(SITE, local))
 left = [u for u in LIBS if u in html or u in localise(worker)]

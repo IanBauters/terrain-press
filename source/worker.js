@@ -101,45 +101,78 @@ function pieceMap(pcs, p, slug) {
   return g.join('\n');
 }
 
+// volume (mm³) and surface area (mm²) of a closed triangle mesh, for filament estimates
+function measure(parts) {
+  let V = 0, A = 0;
+  for (const o of parts) { const t = o.tris;
+    for (let i = 0; i < t.length; i += 9) {
+      const ax = t[i], ay = t[i + 1], az = t[i + 2], bx = t[i + 3], by = t[i + 4], bz = t[i + 5], cx = t[i + 6], cy = t[i + 7], cz = t[i + 8];
+      V += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+      const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
+      A += Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+    } }
+  return { volume: Math.abs(V), area: A };
+}
+// number puzzle pieces in reading order: squares row by row; circles and hexagons centre first, then ring by ring
+// clockwise from 12 o'clock. The guide's piece map and the single-piece files share this numbering.
+function numberPieces(model, p) {
+  const pcs = model.parts.filter(o => o.cell);
+  const cw = model.grid ? Math.min(model.grid.cellW || 1e9, model.grid.cellH || 1e9) : p.widthMm / 5;
+  if (p.shape === 'square') pcs.sort((a, b) => Math.round(ctr(b.ring)[1] / cw) - Math.round(ctr(a.ring)[1] / cw) || ctr(a.ring)[0] - ctr(b.ring)[0]);
+  else {
+    const key = o => { const c = ctr(o.ring); return [o.cell[1], o.cell[1] === 0 ? -1 : (Math.atan2(c[0], c[1]) + 2 * Math.PI) % (2 * Math.PI)]; };
+    pcs.sort((a, b) => { const ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; });
+  }
+  return pcs.map((o, k) => ({ ...o, name: 'Piece ' + (k + 1) }));
+}
+
 function exportFiles(model, p, x) {
-  // x: {slug, colors, spread, spreadGap, readme}
-  const files = [], byRole = r => model.parts.filter(o => o.role === r);
+  // x: {slug, colors, spread, spreadGap, perPiece}
+  // Returns the files plus a description of every print plate, for the print guide.
+  const files = [], plates = [], byRole = r => model.parts.filter(o => o.role === r);
   const drop = (list, dz) => list.map(o => { const t = new Float32Array(o.tris); for (let i = 2; i < t.length; i += 3) t[i] -= dz; return { ...o, tris: t }; });
   const three = async (name, parts, title) => files.push([name, await C.zip(C.model3mf(parts, x.colors, title), deflate)]);
+  const plate = (key, title, parts, names, extra) => plates.push({ key, title, parts, files: names, ...measure(parts), ...(extra || {}) });
+  const puzzle = p.product === 'puzzle', tray = p.border !== 'none' && p.back;
   return (async () => {
-    const s = x.slug, rest = model.parts.filter(o => o.role !== 'terrain');
-    if (p.product === 'puzzle' && x.spread && model.grid) {
+    const s = x.slug, rest = model.parts.filter(o => o.role !== 'terrain'), restTitle = puzzle ? (tray ? 'Tray' : 'Frame') : 'Frame';
+    if (puzzle && x.spread && model.grid) {
       const sp = C.spreadPieces(model.parts, model.grid, x.spreadGap, model.floorZ || 0);
       await three(`${s}-pieces-spread.3mf`, sp.parts, s + '-pieces'); files.push([`${s}-pieces-spread.stl`, C.stl(sp.parts)]);
-      if (rest.length) { await three(`${s}-frame.3mf`, rest, s + '-frame'); files.push([`${s}-frame.stl`, C.stl(rest)]); }
+      plate('pieces', 'Puzzle pieces', sp.parts, [`${s}-pieces-spread.stl`, `${s}-pieces-spread.3mf`], { count: sp.parts.length, spread: true });
+      if (rest.length) { await three(`${s}-frame.3mf`, rest, s + '-frame'); files.push([`${s}-frame.stl`, C.stl(rest)]); plate('frame', restTitle, rest, [`${s}-frame.stl`, `${s}-frame.3mf`]); }
       await three(`${s}-assembled.3mf`, model.parts, s);
-    } else if (p.separate || (p.product === 'puzzle' && model.floorZ > 0)) {
+      plate('assembled', 'Assembled', model.parts, [], { reference: true }); // only for the guide's pictures
+    } else if (p.separate || (puzzle && model.floorZ > 0)) {
       const terr = drop(byRole('terrain'), model.floorZ || 0), a = p.separate ? '1-terrain' : 'pieces', b = p.separate ? '2-frame' : 'tray';
       files.push([`${s}-${a}.stl`, C.stl(terr)]); await three(`${s}-${a}.3mf`, terr, `${s}-${a}`);
-      if (rest.length) { files.push([`${s}-${b}.stl`, C.stl(rest)]); await three(`${s}-${b}.3mf`, rest, `${s}-${b}`); }
+      plate(puzzle ? 'pieces' : 'terrain', puzzle ? 'Puzzle pieces' : 'Terrain', terr, [`${s}-${a}.stl`, `${s}-${a}.3mf`], { count: terr.length, dz: model.floorZ || 0 });
+      if (rest.length) { files.push([`${s}-${b}.stl`, C.stl(rest)]); await three(`${s}-${b}.3mf`, rest, `${s}-${b}`); plate('frame', restTitle, rest, [`${s}-${b}.stl`, `${s}-${b}.3mf`]); }
       await three(`${s}-assembled.3mf`, model.parts, s);
     } else {
       await three(`${s}.3mf`, model.parts, s); files.push([`${s}-all.stl`, C.stl(model.parts)]);
-      files.push([`${s}-${p.product === 'puzzle' ? 'pieces' : 'terrain'}.stl`, C.stl(byRole('terrain'))]);
+      files.push([`${s}-${puzzle ? 'pieces' : 'terrain'}.stl`, C.stl(byRole('terrain'))]);
       if (byRole('frame').length) files.push([`${s}-frame.stl`, C.stl(byRole('frame'))]);
       if (byRole('text').length) files.push([`${s}-lettering.stl`, C.stl(byRole('text'))]);
+      plate('all', puzzle ? 'Puzzle' : 'Ornament', model.parts, [`${s}.3mf`, `${s}-all.stl`], { count: puzzle ? byRole('terrain').length : 1, together: true });
     }
-    if (p.product === 'puzzle' && x.perPiece) {
-      // number in reading order: squares row by row; circles and hexagons centre first, then ring by ring clockwise from 12 o'clock
-      const pcs = model.parts.filter(o => o.cell).map(o => ({ o, lp: o.ring ? labelPoint(o.ring).at : [0, 0] })), pad = String(pcs.length).length;
-      const cw = model.grid ? Math.min(model.grid.cellW || 1e9, model.grid.cellH || 1e9) : p.widthMm / 5;
-      if (p.shape === 'square') pcs.sort((a, b) => Math.round(b.o.ring ? ctr(b.o.ring)[1] / cw : 0) - Math.round(a.o.ring ? ctr(a.o.ring)[1] / cw : 0) || ctr(a.o.ring)[0] - ctr(b.o.ring)[0]);
-      else {
-        const key = q => { const c = ctr(q.o.ring); return [q.o.cell[1], q.o.cell[1] === 0 ? -1 : (Math.atan2(c[0], c[1]) + 2 * Math.PI) % (2 * Math.PI)]; };
-        pcs.forEach(q => q.k = key(q)); pcs.sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1]);
+    let pieces = null;
+    if (puzzle && model.grid) {
+      const pcs = numberPieces(model, p), pad = Math.max(2, String(pcs.length).length);
+      pieces = { outline: C.shapeOutline(p.shape, p.widthMm), list: pcs.map((o, k) => { const lp = labelPoint(o.ring); return { n: k + 1, ring: o.ring, at: lp.at, room: lp.room }; }) };
+      if (x.perPiece) {
+        pcs.forEach((o, k) => files.push([`single-pieces/${s}-piece-${String(k + 1).padStart(pad, '0')}.stl`, C.stl([centre(o)])]));
+        files.push([`single-pieces/${s}-piece-map.svg`, pieceMap(pcs, p, s)]);
+        pieces.files = `single-pieces/${s}-piece-01.stl … ${String(pcs.length).padStart(pad, '0')}.stl`;
       }
-      pcs.forEach((q, k) => q.o = { ...q.o, name: 'Piece ' + (k + 1) });
-      pcs.forEach(({ o }, k) => files.push([`single-pieces/${s}-piece-${String(k + 1).padStart(Math.max(2, pad), '0')}.stl`, C.stl([centre(o)])]));
-      files.push([`single-pieces/${s}-piece-map.svg`, pieceMap(pcs.map(q => q.o), p, s)]);
     }
-    files.push(['README.txt', x.readme(model)]);
-    return C.zip(files, deflate);
+    return { files, plates, pieces };
   })();
+}
+// geometry for the guide's renders: welded, and only what the page needs
+function plateForGuide(pl, transfer) {
+  const parts = pl.parts.map(o => { const w = C.weld(o.tris), v = new Float32Array(w.verts); transfer.push(v.buffer, w.idx.buffer); return { role: o.role, verts: v, idx: w.idx }; });
+  return { ...pl, parts };
 }
 
 self.onmessage = async e => {
@@ -169,9 +202,17 @@ self.onmessage = async e => {
       self.postMessage({ type: 'progress', id: m.id, text: 'Building print mesh…' });
       const model = C.buildModel(m.p, hf, fonts[m.font] || null);
       self.postMessage({ type: 'progress', id: m.id, text: 'Packing files…' });
-      const readme = mdl => m.readme.replace('{{RELIEF}}', mdl.reliefMm.toFixed(1)).replace('{{LOW}}', Math.round(mdl.hMin)).replace('{{HIGH}}', Math.round(mdl.hMax)).replace('{{FRAMETOP}}', (mdl.frameTop || 0).toFixed(2)).replace('{{PX}}', (hf.source.pxKm * 1000).toFixed(0));
-      const z = await exportFiles(model, m.p, { ...m.x, readme });
-      self.postMessage({ type: 'exported', id: m.id, zip: z }, [z.buffer]);
+      const out = await exportFiles(model, m.p, m.x), transfer = [];
+      const plates = out.plates.map(pl => plateForGuide(pl, transfer));
+      for (const f of out.files) if (f[1] instanceof Uint8Array) transfer.push(f[1].buffer);
+      const stats = { reliefMm: model.reliefMm, hMin: model.hMin, hMax: model.hMax, frameTop: model.frameTop || 0, floorZ: model.floorZ || 0, pxM: hf.source.pxKm * 1000, sourceKind: hf.source.kind };
+      self.postMessage({ type: 'exported', id: m.id, files: out.files, plates, pieces: out.pieces, stats }, transfer);
+      return;
+    }
+    if (m.type === 'zip') { // the page adds the print guide (or a plain README) and has the files zipped
+      const z = await C.zip(m.files, deflate);
+      self.postMessage({ type: 'zipped', id: m.id, zip: z }, [z.buffer]);
+      return;
     }
   } catch (err) { self.postMessage({ type: 'error', id: m.id, text: String(err && err.message || err) }); }
 };
