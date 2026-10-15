@@ -26,6 +26,7 @@ Globe images are shaded relief rendered from the same elevation data.
 | [Bootstrap](https://getbootstrap.com) (CSS, trimmed and inlined) | 5.3.3 | MIT | [LICENSES/bootstrap-MIT.txt](LICENSES/bootstrap-MIT.txt) |
 | [poly2tri.js](https://github.com/r3mi/poly2tri.js) | 1.5.0 | BSD 3-Clause | [LICENSES/poly2tri-BSD-3-Clause.txt](LICENSES/poly2tri-BSD-3-Clause.txt) |
 | [Clipper](http://www.angusj.com/delphi/clipper.php) (clipper-lib) | 6.4.2 | Boost Software License 1.0 | [LICENSES/clipper-BSL-1.0.txt](LICENSES/clipper-BSL-1.0.txt) |
+| [jsPDF](https://github.com/parallax/jsPDF) (print guide) | 2.5.1 | MIT | [LICENSES/jspdf-MIT.txt](LICENSES/jspdf-MIT.txt) |
 
 ## Fonts
 

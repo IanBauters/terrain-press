@@ -19,7 +19,8 @@ There are services that charge per download for exactly this kind of file. The e
 - **Jigsaw puzzles** cut to follow the shape: rings for circles, nested hexagons for hexagons, a grid for squares.
   - A large centre piece keeps the landmark whole.
   - A closed-back tray holds the pieces.
-  - Pieces can be spread apart for printing, or exported one STL per piece with a numbered map, so a lost piece is a single reprint.
+  - The pieces come spread apart on one plate, and also as one STL per piece with a numbered map, so a lost piece is a single reprint.
+- **A print guide (PDF) with every download**: settings, filament estimates and a page per print plate.
 - **Settings**: relief exaggeration, rim height, base thickness, clearances, three lettering styles and mesh detail.
 
 Landmarks are built in: every Apollo landing site, Mars landers and rovers from Viking to Perseverance, the Soviet Venus landers, Rheasilvia on Vesta, Sputnik Planitia on Pluto and more. Or click anywhere on the globe.
