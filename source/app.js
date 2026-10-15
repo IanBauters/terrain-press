@@ -483,25 +483,18 @@ const scripts = {};
 function loadScript(src) {
   return scripts[src] || (scripts[src] = new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => { delete scripts[src]; rej(new Error('Could not load ' + src)); }; document.head.appendChild(el); }));
 }
-async function imageData(url, maxW, q) {
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-  const k = Math.min(1, maxW / img.naturalWidth), c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q || 0.85);
-}
 async function printGuide(r, p, slug) {
   await Promise.all([loadScript(JSPDF_URL), loadScript('guide.js?v=' + BUILD)]);
   const W = WORLDS[state.world], L = W.marks.find(x => x.id === state.mark);
   const H = p.shape === 'hexagon' ? p.widthMm * Math.sqrt(3) / 2 : p.widthMm, fr = p.border === 'none' ? 0 : p.frameMm;
-  const [font, globeImg] = await Promise.all([
-    fetch('data/fonts/worm.json').then(x => x.json()).catch(() => null),
-    imageData(`data/${state.world}/globe.jpg`, 1600).catch(() => null)]);
+  const font = await fetch('data/fonts/worm.json').then(x => x.json()).catch(() => null);
   const shape = { circle: 'Circle', square: 'Square', hexagon: 'Hexagon' }[p.shape];
   return TPGuide.make({
     p, slug, colors: state.colors, plates: r.plates, pieces: r.pieces, stats: r.stats, world: { ...W, radiusKm: meta[state.world].radiusKm },
     place: L ? L.name : `${fmtLat(state.lat)} ${fmtLon(state.lon)}`, landmark: L || null, coords: `${fmtLat(state.lat)}  ${fmtLon(state.lon)}`,
     lat: state.lat, lon: state.lon, size: state.size, kind: `${shape} ${p.product}`,
     footprint: `${Math.round(p.widthMm + 2 * fr)} × ${Math.round(H + 2 * fr + (p.loop ? 11 : 0))} mm`,
-    hasAssembled: r.files.some(f => f[0].endsWith('-assembled.3mf')), font, globeImg });
+    hasAssembled: r.files.some(f => f[0].endsWith('-assembled.3mf')), font });
 }
 $('export').onclick = async () => {
   const btn = $('export'); if (btn.disabled || !ready) return; btn.disabled = true; const old = 'Download print files';

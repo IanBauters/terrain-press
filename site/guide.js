@@ -158,34 +158,13 @@
     y = field(doc, 'Model size', `${p.widthMm} mm terrain · ${ctx.footprint} overall`, y);
     y = field(doc, 'Relief', `${ctx.stats.reliefMm.toFixed(1)} mm printed · ${((ctx.stats.hMax - ctx.stats.hMin) / 1000).toFixed(1)} km real · ${p.exag}× exaggeration`, y);
     if (puzzle && ctx.pieces) y = field(doc, 'Pieces', `${ctx.pieces.list.length}`, y);
+    // about the data, in small print under the facts
+    y += 2; doc.setDrawColor(215, 215, 215); doc.setLineWidth(0.2); doc.line(LX, y - 3, LX + LW, y - 3); y += 2;
+    const sample = ctx.stats.pxM < 1000 ? Math.round(ctx.stats.pxM) + ' m' : (ctx.stats.pxM / 1000).toFixed(1) + ' km';
+    if (ctx.landmark) y = para(doc, `${ctx.landmark.name}: ${ctx.landmark.note}.`, y, 9, INK);
+    y = para(doc, `Heights ${Math.round(ctx.stats.hMin)} m to ${Math.round(ctx.stats.hMax)} m, ${ctx.world.datum}, sampled every ${sample}. ${ctx.world.credit}`, y, 7.6, SOFT);
+    y = para(doc, 'A decorative model, not survey-grade data. Not endorsed by NASA, the USGS or DLR. Terrain Press is free and open source (AGPL-3.0); what you make with it is yours to print, share and give away.', y, 7.6, SOFT);
     panel(doc, hero); done();
-
-    // 2 · what's in the download
-    next(); y = title(doc, 'In this download');
-    y = para(doc, 'Every file prints flat on the plate as it comes, no rotating needed. STL works in any slicer; the 3MF files keep the colours and part names.', y);
-    y += 2;
-    const rowsF = [];
-    for (const pl of ctx.plates) rowsF.push([pl.files.join('\n'), pl.together ? 'Everything in one file. Assign a filament to each part in your slicer.' : `${pl.title}: print this plate on its own.`]);
-    if (ctx.hasAssembled) rowsF.push([`${ctx.slug}-assembled.3mf`, 'Everything in place, to look at. Not for printing.']);
-    if (ctx.plates.length === 1 && ctx.plates[0].together) rowsF.push(['The other STL files', 'The same parts on their own, positioned to load together.']);
-    if (ctx.pieces && ctx.pieces.files) rowsF.push([ctx.pieces.files, 'Every puzzle piece as its own file. Lost one? Print just that piece.']);
-    rowsF.push([`${ctx.slug}-print-guide.pdf`, 'This guide.']);
-    const wrapName = name => { // break long file names after hyphens so they never run off the column
-      doc.setFont('courier', 'bold'); doc.setFontSize(8.2); const out = []; let line = '';
-      for (const bit of name.split(/(?<=-)/)) { if (line && doc.getTextWidth(line + bit) > LW) { out.push(line); line = bit; } else line += bit; }
-      if (line) out.push(line); return out;
-    };
-    for (const [f, d] of rowsF) {
-      const fl = f.split('\n').flatMap(wrapName);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); const dl = doc.splitTextToSize(d, LW);
-      const h = fl.length * 3.7 + dl.length * 4.3 + 4;
-      if (y + h > PH - 30) break;
-      doc.setDrawColor(215, 215, 215); doc.setLineWidth(0.2); doc.line(LX, y - 3.8, LX + LW, y - 3.8);
-      doc.setFont('courier', 'bold'); doc.setFontSize(8.2); doc.setTextColor(...INK); doc.text(fl, LX, y, { lineHeightFactor: 1.3 });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...SOFT); doc.text(dl, LX, y + fl.length * 3.7 + 1, { lineHeightFactor: 1.3 });
-      y += h + 3;
-    }
-    panel(doc, render(assembled.length ? assembled : ctx.plates[0].parts, colors, { view: 'top', fov: 20 })); done();
 
     // 3 · general print settings
     next(); y = title(doc, 'General Print Settings');
@@ -201,16 +180,11 @@
     // 4 · filament
     next(); y = title(doc, 'Filament');
     const total = ctx.plates.reduce((t, pl) => t + grams(pl), 0);
-    y = para(doc, `About ${total} g of PLA in total. Matte PLA hides layer lines on the terrain and looks most like rock.`, y); y += 3;
-    const roles = [...new Set(ctx.plates.flatMap(pl => pl.parts.map(q => q.role)))];
-    const roleName = { terrain: puzzle ? 'Terrain (puzzle pieces)' : 'Terrain', frame: puzzle && tray ? 'Tray' : 'Frame', text: 'Lettering' };
-    for (const r of ['terrain', 'frame', 'text']) { if (!roles.includes(r) && !(r === 'text' && p.border === 'lettered')) continue;
-      swatch(doc, colors[r], LX, y - 6);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK); doc.text(roleName[r], LX + 13, y - 2.6);
-      doc.setFont('helvetica', 'bold'); doc.text(r === 'text' && p.mergeText ? `Colour ${colors[r].toUpperCase()} · optional: change filament at ${ctx.stats.frameTop.toFixed(2)} mm` : `Colour ${colors[r].toUpperCase()}`, LX + 13, y + 2.2);
-      y += 15; }
-    y += 2;
-    if (p.border === 'lettered') y = para(doc, 'No multi-colour printer? Print the lettering in one colour with the frame, or pause at the height above and swap filament for the letters.', y, 9.5, SOFT);
+    y = field(doc, 'Material', 'PLA is all you need', y);
+    y = field(doc, 'Finish', 'Matte PLA hides the layer lines, so the terrain reads best', y);
+    y = field(doc, 'Ironing', 'Off. Ironing flattens the fine relief on top', y);
+    y = field(doc, 'Filament use', `About ${total} g in total`, y);
+    if (p.border === 'lettered') { y += 2; y = para(doc, `No multi-colour printer? Print the lettering in one colour with the frame, or pause at ${ctx.stats.frameTop.toFixed(2)} mm and swap filament for the letters.`, y, 9.5, SOFT); }
     panel(doc, hero); done();
 
     // 5 · one page per print plate
@@ -240,71 +214,6 @@
       }
       done();
     }
-
-    // 6 · piece map
-    if (ctx.pieces) {
-      next(); y = title(doc, 'Piece Map');
-      y = para(doc, 'The puzzle seen from above. The numbers match the single-piece files, so a lost piece is one quick reprint.', y);
-      if (ctx.pieces.files) y = field(doc, 'Example', `Piece 7 is ${ctx.slug}-piece-07.stl`, y + 2);
-      doc.setFillColor(...LIGHT_PANEL); doc.rect(SPLIT, 0, PW - SPLIT, PH, 'F');
-      const W = p.widthMm, pw = PW - SPLIT - 20, s = pw / (W * 1.04), cx = SPLIT + (PW - SPLIT) / 2, cy = PH / 2 - 4;
-      const M = ([x, yy]) => [cx + x * s, cy - yy * s];
-      const poly = (ring, style) => { ring.forEach((pt, i) => { const [a, bb] = M(pt); if (i === 0) doc.moveTo(a, bb); else doc.lineTo(a, bb); }); doc.close(); if (style === 'F') doc.fill(); else if (style === 'FD') doc.fillStroke(); else doc.stroke(); };
-      doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.25); doc.setLineDashPattern([1.2, 0.8], 0); poly(ctx.pieces.outline, 'S'); doc.setLineDashPattern([], 0);
-      doc.setFillColor(252, 251, 248); doc.setDrawColor(40, 40, 40); doc.setLineWidth(0.22);
-      for (const pc of ctx.pieces.list) poly(pc.ring, 'FD');
-      doc.setTextColor(...INK); doc.setFont('helvetica', 'bold');
-      for (const pc of ctx.pieces.list) { const fs = Math.max(4.5, Math.min(13, pc.room * s * 1.9)); doc.setFontSize(fs); const [a, bb] = M(pc.at); doc.text(String(pc.n), a, bb + fs * 0.12, { align: 'center' }); }
-      done();
-    }
-
-    // 7 · assembly
-    next(); y = title(doc, 'Assembly');
-    const steps = [];
-    if (puzzle) {
-      if (tray) steps.push(['Start with the tray', 'Lay the tray flat with the open side up.']);
-      steps.push(p.shape === 'square' ? ['Start in a corner', 'Piece 1 is the top-left corner. Put it in first.'] : ['Find the centre', 'Piece 1 is the large centre piece. Put it in first.']);
-      steps.push(['Work outwards', 'Press each piece in from above until the knobs click into their sockets. They should slide in without force.']);
-      steps.push(['Too tight?', 'A light pass with fine sandpaper on the knob, or reprint with a little more clearance.']);
-    } else if (p.separate) {
-      steps.push(['Dry fit', 'Drop the terrain into the frame. It should sit flat with a hair of play all round.']);
-      steps.push(['Glue', 'A few small drops of glue in the frame are enough. Superglue or a clear contact glue works.']);
-      if (p.loop) steps.push(['Hang it', 'Thread a ribbon or cord through the loop at the top.']);
-    } else {
-      steps.push(['Nothing to assemble', 'The ornament prints as one piece.']);
-      if (p.loop) steps.push(['Hang it', 'Thread a ribbon or cord through the loop at the top.']);
-    }
-    steps.forEach(([h, t], i) => {
-      doc.setFillColor(...INK); doc.circle(LX + 3.4, y - 1.4, 3.4, 'F'); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(String(i + 1), LX + 3.4, y + 0.2, { align: 'center' });
-      doc.setTextColor(...INK); doc.setFontSize(11); doc.text(h, LX + 10, y);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); const ls = doc.splitTextToSize(t, LW - 10); doc.text(ls, LX + 10, y + 5.2, { lineHeightFactor: 1.3 }); y += 7 + ls.length * 4.6 + 4;
-    });
-    panel(doc, render(assembled.length ? assembled : ctx.plates[0].parts, colors, { view: 'top', fov: 20, zoom: 0.92 })); done();
-
-    // 8 · about the data
-    next(); y = title(doc, 'About the Data');
-    if (ctx.landmark) y = para(doc, `${ctx.landmark.name}: ${ctx.landmark.note}.`, y);
-    y = para(doc, `Heights ${Math.round(ctx.stats.hMin)} m to ${Math.round(ctx.stats.hMax)} m, ${ctx.world.datum}. The model samples the data every ${ctx.stats.pxM < 1000 ? Math.round(ctx.stats.pxM) + ' m' : (ctx.stats.pxM / 1000).toFixed(1) + ' km'}.`, y);
-    y = para(doc, ctx.world.credit, y, 9.5, SOFT);
-    if (ctx.world.partial) y = para(doc, 'Only part of this world was mapped up close. Areas outside it are a smooth fill.', y, 9.5, SOFT);
-    y = para(doc, 'A decorative model, not survey-grade data. Not endorsed by NASA, the USGS or DLR.', y, 9.5, SOFT);
-    y += 3;
-    y = para(doc, 'Terrain Press is free and open-source software (AGPL-3.0). The files you make are yours to print, share and give away. Source code and updates: github.com/IanBauters/terrain-press', y, 9.5);
-    // the world map with the area marked
-    doc.setFillColor(...PANEL_RGB); doc.rect(SPLIT, 0, PW - SPLIT, PH, 'F');
-    if (ctx.globeImg) {
-      const mw = PW - SPLIT - 16, mh = mw / 2, mx = SPLIT + 8, my = PH / 2 - mh / 2;
-      doc.addImage(ctx.globeImg, 'JPEG', mx, my, mw, mh, undefined, 'FAST');
-      const ux = mx + (ctx.lon + 180) / 360 * mw, uy = my + (90 - ctx.lat) / 180 * mh, r = Math.max(1.6, ctx.size / (2 * Math.PI * ctx.world.radiusKm) * mw / 2);
-      doc.saveGraphicsState(); doc.rect(mx, my, mw, mh, null); doc.clip(); doc.discardPath();
-      doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.6); doc.circle(ux, uy, r, 'S'); doc.setDrawColor(10, 10, 10); doc.setLineWidth(0.3); doc.circle(ux, uy, r + 0.6, 'S');
-      doc.restoreGraphicsState();
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.6); const lbl = ctx.place, tw = doc.getTextWidth(lbl) + 6;
-      const lx = Math.min(PW - 6 - tw, Math.max(SPLIT + 4, ux - tw / 2)), ly = Math.min(my + mh + 9, Math.max(my - 13, uy + r + 4 > my + mh - 8 ? uy - r - 11 : uy + r + 4));
-      doc.setFillColor(10, 10, 10); doc.rect(lx, ly, tw, 6.6, 'F'); doc.setTextColor(255, 255, 255); doc.text(lbl, lx + 3, ly + 4.5);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(220, 220, 220); doc.text(`${ctx.world.name}, whole surface · the circle marks the area printed`, mx, my + mh + 20);
-    }
-    done();
 
     if (R) { R.dispose(); R = null; }
     return new Uint8Array(doc.output('arraybuffer'));
