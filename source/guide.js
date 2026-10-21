@@ -196,6 +196,8 @@
       y = field(doc, 'Wall count', isFrame ? '3 or more' : '2 or more', y);
       y = field(doc, 'Infill density', isFrame ? '20 % or more' : '15 %', y);
       if (isPieces || (pl.together && puzzle)) y = field(doc, 'Fit', `${p.gapMm} mm clearance is built in. Keep elephant-foot compensation on (about 0.1 mm) so the pieces slide together.`, y);
+      if ((isPieces || (pl.together && puzzle)) && p.pieceNumbers) y = field(doc, 'Piece numbers', 'Engraved under each piece, mirrored so they read when you turn it over. They match the single-piece files and the map.', y);
+      if (isFrame && puzzle && tray && p.floorKnurl) y = field(doc, 'Floor', 'Knurled, so the pieces lift out easily. Leave ironing off.', y);
       if (pl.key === 'terrain') y = field(doc, 'Fit', `${p.gapMm} mm clearance to the frame. A drop of glue holds it in place.`, y);
       if ((isFrame || pl.together) && p.border === 'lettered') y = field(doc, 'Coloured letters', p.mergeText ? `Change filament at ${ctx.stats.frameTop.toFixed(2)} mm` : 'The lettering is a separate part: give it its own filament', y);
       const img = render(pl.parts, colors, { view: 'front' }), fr = panel(doc, img), b = bbox(pl.parts);

@@ -139,7 +139,7 @@ function params(step) {
     shape: state.shape, product, widthMm: +$('width').value, exag: exFromSlider(+$('exag').value),
     baseMm: clamp(+$('base').value, 1, 8, 2), frameMm: clamp(+$('frame').value, 4, 14, 7), rimMm: clamp(+$('rim').value, 0.5, 30, 3), rimAuto: $('rim-auto').checked, textMm: 0.8,
     textTop: $('t-top').value.trim(), textBottom: $('t-bottom').value.trim(),
-    pieces: Math.round(clamp(+$('pieces').value, 2, 12, 5)), gapMm: clamp(+$('gap').value, 0.1, 0.6, 0.3),
+    pieces: Math.round(clamp(+$('pieces').value, 2, 12, 5)), knurl: $('knurl').checked, floorKnurl: $('floor-knurl').checked, pieceNumbers: $('piece-numbers').checked, gapMm: clamp(+$('gap').value, 0.1, 0.6, 0.3),
     separate: product === 'ornament' && border !== 'none' && $('separate').checked,
     loop: product === 'ornament' && border !== 'none' && $('loop').checked,
     stepMm: step, border, mergeText: $('merge').checked, back: $('back').checked, backMm: clamp(+$('back-mm').value, 0.8, 4, 1.6),
@@ -430,8 +430,8 @@ function syncMode() {
   const orn = state.product === 'ornament', framed = state.border !== 'none', sep = orn && framed && $('separate').checked;
   $('orn-opts').hidden = !orn || !framed; $('loop-wrap').hidden = !orn || !framed;
   $('fit-row').hidden = !(state.product === 'puzzle' || sep); $('pieces-wrap').hidden = state.product !== 'puzzle';
-  $('spread-opts').hidden = state.product !== 'puzzle';
-  $('back-opts').hidden = !framed; $('back-row').hidden = !$('back').checked;
+  $('spread-opts').hidden = $('numbers-wrap').hidden = state.product !== 'puzzle';
+  $('back-opts').hidden = !framed; $('back-row').hidden = !$('back').checked; $('floor-knurl-wrap').hidden = state.product !== 'puzzle' || !$('back').checked;
   $('letter-opts').hidden = state.border !== 'lettered';
   $('frame').disabled = $('rim').disabled = !framed; $('rim-auto-wrap').hidden = !framed;
   $('loop-note').hidden = !(orn && state.border === 'lettered' && $('loop').checked);
@@ -443,7 +443,7 @@ function syncMode() {
   $('export-note').textContent = (state.product === 'puzzle' || sep ? 'A .zip with one file per print plate (STL and 3MF)' : 'A .zip with STL and multicolour 3MF files') + (state.product === 'puzzle' ? ', every piece on its own and a print guide.' : ' and a print guide.');
 }
 document.querySelectorAll('input[type=radio]').forEach(el => el.addEventListener('change', () => { syncMode(); if (el.name === 'shape' && globe) globe.refresh(); if (el.name !== 'detail') schedule(); }));
-['separate', 'loop', 'back', 'merge', 'rim-auto'].forEach(id => $(id).addEventListener('change', () => { syncMode(); schedule(); }));
+['separate', 'loop', 'back', 'merge', 'rim-auto', 'knurl', 'floor-knurl', 'piece-numbers'].forEach(id => $(id).addEventListener('change', () => { syncMode(); schedule(); }));
 ['base', 'frame', 'rim', 'pieces', 'gap', 'spread-gap', 'back-mm', 't-top', 't-bottom'].forEach(id => $(id).addEventListener('input', () => schedule()));
 $('width').addEventListener('input', () => { $('o-width').textContent = $('width').value + ' mm'; schedule(); });
 $('exag').addEventListener('input', () => { $('o-exag').textContent = exFromSlider(+$('exag').value) + '×'; schedule(); });

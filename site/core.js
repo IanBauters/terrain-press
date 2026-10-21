@@ -257,9 +257,45 @@
     }
     return pts;
   }
-  function solid(ex, topZ, bottomZ, step, out) {
+  // ---------- knurled edge: a criss-cross diamond texture on a frame's outer wall ----------
+  // The outline is resampled evenly so the pattern repeats a whole number of times around it; the texture fades
+  // out near the top and bottom edge, so the wall meets the flat faces exactly and the mesh stays closed.
+  function knurlRing(ring, pitch) {
+    const n = ring.length, cum = [0];
+    for (let i = 1; i <= n; i++) cum.push(cum[i - 1] + Math.hypot(ring[i % n][0] - ring[i - 1][0], ring[i % n][1] - ring[i - 1][1]));
+    const P = cum[n], reps = Math.max(8, Math.round(P / pitch)), m = reps * 4, out = [];
+    let k = 0;
+    for (let q = 0; q < m; q++) {
+      const u = q / m * P; while (k < n - 1 && cum[k + 1] < u) k++;
+      const a = ring[k], b = ring[(k + 1) % n], t = (u - cum[k]) / ((cum[k + 1] - cum[k]) || 1);
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+    return { pts: out, pitch: P / reps };
+  }
+  function knurlWall(ring, pitch, depth, z0, z1, push) { // ring: ccw, from knurlRing
+    const n = ring.length, nrm = [];
+    for (let i = 0; i < n; i++) { // outward vertex normals of a ccw ring
+      const a = ring[(i - 1 + n) % n], b = ring[i], c = ring[(i + 1) % n];
+      let x = (b[1] - a[1]) + (c[1] - b[1]), y = -(b[0] - a[0]) - (c[0] - b[0]); const l = Math.hypot(x, y) || 1; nrm.push([x / l, y / l]);
+    }
+    const rows = Math.max(2, Math.round((z1 - z0) / (pitch / 4))), dz = (z1 - z0) / rows, fade = Math.min(0.6, (z1 - z0) / 3);
+    const tent = v => { const f = v - Math.floor(v); return 1 - 2 * Math.abs(f - 0.5); };
+    const P = (i, r) => {
+      const z = z0 + r * dz, ii = ((i % n) + n) % n, s = ii / 4; // s in pitches along the wall
+      const env = Math.max(0, Math.min(1, (z - z0) / fade, (z1 - z) / fade));
+      const d = depth * env * Math.min(tent(s + (z - z0) / pitch + 0.5), tent(s - (z - z0) / pitch + 0.5));
+      return [ring[ii][0] + nrm[ii][0] * d, ring[ii][1] + nrm[ii][1] * d, z];
+    };
+    for (let r = 0; r < rows; r++) for (let i = 0; i < n; i++) {
+      const a0 = P(i, r), b0 = P(i + 1, r), a1 = P(i, r + 1), b1 = P(i + 1, r + 1);
+      push(a0, b0, b1); push(a0, b1, a1);
+    }
+  }
+
+  function solid(ex, topZ, bottomZ, step, out, knurl) {
     ex = { outer: ccw(cleanRing(ex.outer, 0.02)), holes: ex.holes.map(h => cw(cleanRing(h, 0.02))).filter(h => h.length >= 3) };
     if (ex.outer.length < 3) return;
+    let kn = null; if (knurl) { kn = knurlRing(ex.outer, knurl.pitch); ex.outer = kn.pts; }
     const tz = typeof topZ === 'function' ? topZ : () => topZ;
     let tris;
     const st = step ? steinerPoints(ex, step) : [];
@@ -285,6 +321,7 @@
       push([a[0], a[1], bottomZ], [b[0], b[1], bottomZ], [c[0], c[1], bottomZ]);
     }
     for (const ring of [ex.outer, ...ex.holes]) {
+      if (kn && ring === ex.outer && typeof topZ !== 'function') { knurlWall(ring, kn.pitch, knurl.depth, bottomZ, topZ, push); continue; }
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], b = ring[(i + 1) % ring.length];
         const at = [a[0], a[1], z(a)], bt = [b[0], b[1], z(b)], ab = [a[0], a[1], bottomZ], bb = [b[0], b[1], bottomZ];
@@ -294,8 +331,11 @@
   }
 
   // body: {outer ccw, holes cw} (holes = through-holes such as the hanging loop); pocket: ccw rings recessed down to floorZ
-  function traySolid(body, pocket, topZ, floorZ, out) {
+  // floorKnurl: {pitch, depth} — the same criss-cross diamonds as the knurled edge, on the pocket floor. The floor is
+  // lowered by the depth, so whatever sits in the tray rests on the diamond tips at the original floor height.
+  function traySolid(body, pocket, topZ, floorZ, out, knurl, floorKnurl) {
     const push = (a, b, c) => out.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    let kn = null; if (knurl) { kn = knurlRing(body.outer, knurl.pitch); body = { outer: kn.pts, holes: body.holes }; }
     const face = (ex, z, up) => {
       for (const t of triangulate(ex, [])) {
         let [a, b, c] = t;
@@ -312,10 +352,148 @@
     };
     face(body, 0, false);
     face({ outer: body.outer, holes: [...body.holes, ...pocket.map(r => cw(r))] }, topZ, true);
-    for (const r of pocket) face({ outer: r, holes: [] }, floorZ, true);
-    walls(body.outer, 0, topZ);
+    const fz = floorKnurl ? floorZ - floorKnurl.depth : floorZ;
+    for (const r of pocket) if (floorKnurl) knurlFloor(r, fz, floorKnurl, push); else face({ outer: r, holes: [] }, fz, true);
+    if (kn) knurlWall(body.outer, kn.pitch, knurl.depth, 0, topZ, push); else walls(body.outer, 0, topZ);
     for (const h of body.holes) walls(h, 0, topZ);
-    for (const r of pocket) walls(cw(r), floorZ, topZ);
+    for (const r of pocket) walls(cw(r), fz, topZ);
+  }
+  // A pocket floor covered in diamond pyramids, rising `depth` above fz, on a grid at 45°. Whole pyramids are built
+  // directly (four flat facets each); the strip between them and the pocket wall is triangulated separately, with the
+  // texture fading out within 1 mm of the wall, so the floor meets the wall at fz and the mesh stays closed.
+  function knurlFloor(ring, fz, { pitch, depth }, push) {
+    const r = ccw(ring), s2 = Math.SQRT1_2 * pitch, fade = 1.0;
+    // grid corner (i, j) and the apex of cell (i, j), in mm; corners get a tiny fixed nudge so no three line up exactly
+    const corner = (i, j) => { const h = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453; const f = h - Math.floor(h);
+      return [(i + j) * s2 + 1e-5 * (f - 0.5), (i - j) * s2 + 1e-5 * (((h * 7) % 1 + 1) % 1 - 0.5)]; };
+    const apex = (i, j) => [(i + j + 1) * s2, (i - j) * s2];
+    const tent = v => { const f = v - Math.floor(v); return 1 - 2 * Math.abs(f - 0.5); };
+    const zAt = (x, y) => {
+      const d = distToRing(x, y, r); if (d <= 1e-4) return fz;
+      const u = (x + y) / (2 * s2), v = (x - y) / (2 * s2);
+      return fz + depth * Math.min(1, d / fade) * Math.min(tent(u), tent(v));
+    };
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const i0 = Math.floor((x0 + y0) / (2 * s2)) - 2, i1 = Math.ceil((x1 + y1) / (2 * s2)) + 2;
+    const j0 = Math.floor((x0 - y1) / (2 * s2)) - 2, j1 = Math.ceil((x1 - y0) / (2 * s2)) + 2;
+    const K = (i, j) => i + ',' + j, deep = new Map();
+    const isDeep = (i, j) => { const k = K(i, j); if (!deep.has(k)) { const [x, y] = corner(i, j); deep.set(k, pointInRing(x, y, r) && distToRing(x, y, r) >= fade + 0.05); } return deep.get(k); };
+    // whole pyramids: every corner a full fade away from the wall
+    const C = new Set();
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++)
+      if (isDeep(i, j) && isDeep(i + 1, j) && isDeep(i + 1, j + 1) && isDeep(i, j + 1)) C.add(K(i, j));
+    // no two pyramids touching only at a corner, and one connected patch
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const k of [...C]) { const [i, j] = k.split(',').map(Number);
+        for (const [di, dj] of [[1, 1], [1, -1]]) if (C.has(K(i + di, j + dj)) && !C.has(K(i + di, j)) && !C.has(K(i, j + dj))) { C.delete(k); changed = true; break; } }
+    }
+    if (C.size) {
+      const seen = new Set(), comps = [];
+      for (const k of C) { if (seen.has(k)) continue; const comp = [], st = [k]; seen.add(k);
+        while (st.length) { const c = st.pop(); comp.push(c); const [i, j] = c.split(',').map(Number);
+          for (const n of [K(i + 1, j), K(i - 1, j), K(i, j + 1), K(i, j - 1)]) if (C.has(n) && !seen.has(n)) { seen.add(n); st.push(n); } }
+        comps.push(comp); }
+      comps.sort((a, b) => b.length - a.length); for (const comp of comps.slice(1)) for (const k of comp) C.delete(k);
+    }
+    const flat = () => { for (const t of triangulate({ outer: r, holes: [] }, [])) { let [a, b, c] = t;
+      if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b]; push([a[0], a[1], fz], [b[0], b[1], fz], [c[0], c[1], fz]); } };
+    if (C.size < 4) return flat();
+    // outline of the pyramid patch: cell edges with no pyramid on the other side, chained into one loop
+    const next = new Map(), cellEdges = (i, j) => [[[i, j], [i + 1, j], [i, j - 1]], [[i + 1, j], [i + 1, j + 1], [i + 1, j]], [[i + 1, j + 1], [i, j + 1], [i, j + 1]], [[i, j + 1], [i, j], [i - 1, j]]];
+    for (const k of C) { const [i, j] = k.split(',').map(Number);
+      for (const [a, b, n] of cellEdges(i, j)) if (!C.has(K(n[0], n[1]))) next.set(K(a[0], a[1]), b); }
+    const startK = next.keys().next().value, loop = [];
+    let cur = startK.split(',').map(Number);
+    for (let g = 0; g <= next.size; g++) { loop.push(corner(cur[0], cur[1])); cur = next.get(K(cur[0], cur[1])); if (!cur || K(cur[0], cur[1]) === startK) break; }
+    if (!cur || loop.length !== next.size) return flat(); // a patch with a hole in it: keep it simple
+    // the strip between the wall and the patch, with grid points inside it so the fade follows the pattern
+    const onPatch = new Set(); for (const k of C) { const [i, j] = k.split(',').map(Number); for (const [a, b] of [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]]) onPatch.add(K(a, b)); }
+    const steiner = [], keepPt = ([x, y]) => pointInRing(x, y, r) && distToRing(x, y, r) >= 0.2;
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      if (!onPatch.has(K(i, j))) { const c = corner(i, j); if (keepPt(c)) steiner.push(c); }
+      if (!C.has(K(i, j))) { const a = apex(i, j); if (keepPt(a)) steiner.push(a); }
+    }
+    let band;
+    try { band = triangulate({ outer: r, holes: [cw(loop)] }, steiner); }
+    catch (e) { try { band = triangulate({ outer: r, holes: [cw(loop)] }, []); } catch (e2) { return flat(); } }
+    const up = (a, b, c) => { if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b]; push(a, b, c); };
+    for (const [a, b, c] of band) up([a[0], a[1], zAt(a[0], a[1])], [b[0], b[1], zAt(b[0], b[1])], [c[0], c[1], zAt(c[0], c[1])]);
+    for (const k of C) { const [i, j] = k.split(',').map(Number), ap = apex(i, j), top = [ap[0], ap[1], fz + depth];
+      for (const [a, b] of cellEdges(i, j)) { const pa = corner(a[0], a[1]), pb = corner(b[0], b[1]); up([pa[0], pa[1], fz], [pb[0], pb[1], fz], top); } }
+  }
+
+  // ---------- piece numbers, engraved into the underside ----------
+  // Digit outlines from DejaVu Sans Mono Bold (the font Menlo, the classic Mac Terminal font, is based on), scaled so a
+  // digit is 1 unit tall; flattened from the font's curves. Mirrored when engraved, so they read when the piece is turned over.
+  const ENGRAVE_MM = 0.45;
+  const MONO = {"adv":0.796,"h":1,"g":{"0":[[0.318,0.5,0.318,0.5,0.318,0.511,0.32,0.521,0.323,0.531,0.328,0.54,0.334,0.549,0.341,0.557,0.349,0.564,0.358,0.57,0.367,0.575,0.376,0.578,0.387,0.58,0.398,0.58,0.398,0.58,0.409,0.58,0.419,0.578,0.429,0.575,0.438,0.57,0.447,0.564,0.455,0.557,0.462,0.549,0.468,0.54,0.473,0.531,0.476,0.521,0.478,0.511,0.478,0.5,0.478,0.5,0.478,0.489,0.476,0.478,0.473,0.469,0.468,0.46,0.462,0.451,0.455,0.443,0.447,0.436,0.438,0.43,0.429,0.425,0.419,0.422,0.409,0.42,0.398,0.42,0.398,0.42,0.387,0.42,0.376,0.422,0.367,0.425,0.358,0.43,0.349,0.436,0.341,0.443,0.334,0.45,0.328,0.459,0.323,0.468,0.32,0.478,0.318,0.489,0.318,0.5],[0.398,0.839,0.398,0.839,0.377,0.836,0.358,0.83,0.341,0.818,0.326,0.803,0.313,0.783,0.301,0.758,0.292,0.728,0.285,0.693,0.279,0.653,0.275,0.607,0.272,0.556,0.271,0.5,0.271,0.5,0.272,0.443,0.275,0.392,0.279,0.347,0.285,0.307,0.292,0.272,0.301,0.242,0.313,0.217,0.326,0.197,0.341,0.182,0.358,0.17,0.377,0.164,0.398,0.161,0.398,0.161,0.419,0.164,0.438,0.17,0.455,0.182,0.47,0.197,0.483,0.217,0.495,0.242,0.504,0.272,0.511,0.307,0.517,0.347,0.521,0.392,0.524,0.443,0.525,0.5,0.525,0.5,0.524,0.556,0.521,0.607,0.517,0.653,0.511,0.693,0.504,0.728,0.495,0.758,0.483,0.783,0.47,0.803,0.455,0.818,0.438,0.83,0.419,0.836,0.398,0.839],[0.079,0.5,0.079,0.5,0.082,0.58,0.088,0.653,0.099,0.719,0.115,0.778,0.135,0.83,0.159,0.875,0.188,0.913,0.221,0.944,0.258,0.969,0.3,0.986,0.347,0.997,0.398,1,0.398,1,0.449,0.997,0.495,0.986,0.538,0.969,0.575,0.945,0.608,0.913,0.637,0.875,0.661,0.83,0.681,0.778,0.697,0.719,0.708,0.653,0.714,0.58,0.717,0.5,0.717,0.5,0.714,0.42,0.708,0.347,0.697,0.281,0.681,0.222,0.661,0.17,0.637,0.125,0.608,0.087,0.575,0.055,0.538,0.031,0.495,0.014,0.449,0.003,0.398,0,0.398,0,0.347,0.003,0.3,0.014,0.258,0.031,0.221,0.056,0.188,0.087,0.159,0.125,0.135,0.17,0.115,0.222,0.099,0.281,0.088,0.347,0.082,0.42,0.079,0.5]],"1":[[0.121,0.019,0.121,0.187,0.334,0.187,0.334,0.812,0.136,0.763,0.136,0.935,0.336,0.983,0.52,0.983,0.52,0.187,0.733,0.187,0.733,0.019,0.121,0.019]],"2":[[0.28,0.187,0.28,0.187,0.686,0.187,0.686,0.019,0.074,0.019,0.074,0.181,0.178,0.291,0.235,0.352,0.284,0.405,0.325,0.449,0.359,0.485,0.384,0.513,0.401,0.532,0.401,0.532,0.416,0.55,0.43,0.568,0.443,0.584,0.453,0.6,0.463,0.616,0.471,0.63,0.477,0.645,0.482,0.659,0.487,0.673,0.49,0.687,0.491,0.701,0.492,0.715,0.492,0.715,0.491,0.736,0.488,0.755,0.482,0.773,0.475,0.788,0.465,0.802,0.453,0.815,0.439,0.826,0.423,0.835,0.406,0.841,0.386,0.846,0.365,0.849,0.342,0.85,0.342,0.85,0.325,0.85,0.307,0.848,0.288,0.845,0.269,0.841,0.248,0.836,0.228,0.83,0.206,0.823,0.185,0.814,0.163,0.805,0.14,0.795,0.118,0.783,0.095,0.771,0.095,0.771,0.095,0.948,0.118,0.956,0.141,0.964,0.163,0.971,0.186,0.977,0.208,0.982,0.23,0.987,0.252,0.991,0.274,0.994,0.295,0.997,0.316,0.999,0.337,1,0.357,1,0.357,1,0.406,0.998,0.452,0.992,0.494,0.982,0.532,0.968,0.567,0.95,0.597,0.929,0.624,0.903,0.646,0.875,0.663,0.844,0.675,0.81,0.683,0.774,0.685,0.734,0.685,0.734,0.684,0.715,0.683,0.697,0.68,0.679,0.676,0.661,0.672,0.644,0.666,0.628,0.659,0.611,0.65,0.593,0.64,0.575,0.628,0.556,0.615,0.537,0.6,0.517,0.6,0.517,0.586,0.499,0.564,0.476,0.536,0.446,0.502,0.41,0.46,0.368,0.413,0.32,0.413,0.32,0.386,0.293,0.361,0.268,0.338,0.245,0.317,0.223,0.297,0.204,0.28,0.187]],"3":[[0.354,0.45,0.354,0.45,0.252,0.45,0.252,0.618,0.354,0.618,0.377,0.619,0.398,0.621,0.417,0.625,0.435,0.63,0.451,0.637,0.464,0.646,0.476,0.656,0.486,0.667,0.494,0.68,0.499,0.694,0.502,0.709,0.504,0.725,0.504,0.725,0.502,0.742,0.499,0.758,0.494,0.773,0.486,0.786,0.476,0.798,0.464,0.809,0.451,0.818,0.435,0.825,0.417,0.831,0.398,0.835,0.377,0.838,0.354,0.839,0.354,0.839,0.336,0.838,0.317,0.837,0.298,0.835,0.279,0.833,0.259,0.829,0.238,0.825,0.217,0.82,0.196,0.815,0.175,0.808,0.154,0.802,0.132,0.794,0.11,0.786,0.11,0.786,0.11,0.959,0.132,0.965,0.154,0.971,0.176,0.976,0.198,0.981,0.219,0.986,0.241,0.989,0.262,0.993,0.283,0.995,0.304,0.997,0.325,0.999,0.345,1,0.365,1,0.365,1,0.414,0.998,0.459,0.993,0.5,0.983,0.538,0.97,0.572,0.954,0.602,0.934,0.628,0.91,0.65,0.884,0.666,0.854,0.678,0.822,0.685,0.788,0.688,0.75,0.688,0.75,0.686,0.722,0.682,0.696,0.675,0.672,0.666,0.65,0.653,0.629,0.638,0.61,0.621,0.593,0.601,0.578,0.579,0.565,0.554,0.554,0.528,0.545,0.498,0.538,0.498,0.538,0.531,0.531,0.562,0.521,0.589,0.509,0.614,0.494,0.636,0.476,0.656,0.456,0.672,0.434,0.686,0.409,0.697,0.382,0.704,0.353,0.709,0.321,0.71,0.287,0.71,0.287,0.708,0.242,0.7,0.201,0.688,0.164,0.67,0.13,0.648,0.1,0.62,0.074,0.588,0.051,0.552,0.033,0.51,0.018,0.465,0.008,0.414,0.002,0.36,0,0.36,0,0.335,0,0.311,0.001,0.287,0.003,0.263,0.005,0.24,0.009,0.216,0.012,0.193,0.017,0.17,0.022,0.147,0.027,0.124,0.033,0.102,0.04,0.081,0.048,0.081,0.048,0.081,0.225,0.101,0.215,0.122,0.206,0.144,0.198,0.166,0.191,0.189,0.184,0.212,0.179,0.235,0.174,0.259,0.17,0.284,0.167,0.309,0.164,0.334,0.163,0.36,0.163,0.36,0.163,0.385,0.164,0.408,0.167,0.429,0.172,0.449,0.179,0.466,0.188,0.482,0.199,0.496,0.211,0.507,0.225,0.516,0.241,0.522,0.257,0.526,0.275,0.527,0.295,0.527,0.295,0.526,0.319,0.522,0.341,0.516,0.361,0.507,0.379,0.496,0.395,0.482,0.41,0.466,0.422,0.448,0.432,0.428,0.44,0.405,0.445,0.381,0.449,0.354,0.45]],"4":[[0.448,0.39,0.448,0.771,0.205,0.39,0.448,0.39],[0.066,0.411,0.431,0.983,0.631,0.983,0.631,0.39,0.737,0.39,0.737,0.227,0.631,0.227,0.631,0.019,0.448,0.019,0.448,0.227,0.066,0.227,0.066,0.411]],"5":[[0.125,0.444,0.125,0.983,0.648,0.983,0.648,0.815,0.279,0.815,0.279,0.636,0.287,0.639,0.295,0.641,0.303,0.644,0.311,0.646,0.32,0.648,0.329,0.649,0.338,0.65,0.347,0.651,0.356,0.652,0.365,0.653,0.375,0.653,0.385,0.653,0.385,0.653,0.431,0.651,0.474,0.643,0.515,0.631,0.552,0.613,0.586,0.591,0.617,0.563,0.644,0.531,0.667,0.497,0.684,0.459,0.696,0.418,0.704,0.375,0.706,0.328,0.706,0.328,0.704,0.279,0.696,0.234,0.682,0.192,0.663,0.154,0.639,0.119,0.61,0.088,0.576,0.061,0.538,0.039,0.496,0.022,0.45,0.01,0.4,0.002,0.347,0,0.347,0,0.326,0,0.305,0.001,0.284,0.003,0.263,0.005,0.242,0.007,0.221,0.01,0.2,0.014,0.179,0.018,0.158,0.023,0.136,0.029,0.114,0.035,0.092,0.041,0.092,0.041,0.092,0.213,0.11,0.205,0.128,0.197,0.147,0.19,0.165,0.184,0.184,0.178,0.202,0.173,0.221,0.169,0.24,0.166,0.259,0.163,0.278,0.162,0.297,0.16,0.316,0.16,0.316,0.16,0.348,0.161,0.377,0.165,0.404,0.171,0.428,0.179,0.45,0.19,0.469,0.203,0.485,0.218,0.498,0.236,0.508,0.256,0.515,0.278,0.52,0.302,0.521,0.328,0.521,0.328,0.52,0.352,0.515,0.375,0.508,0.396,0.498,0.415,0.485,0.433,0.469,0.449,0.451,0.463,0.431,0.474,0.408,0.483,0.384,0.489,0.358,0.493,0.331,0.495,0.331,0.495,0.314,0.494,0.296,0.493,0.279,0.491,0.262,0.489,0.245,0.486,0.228,0.482,0.211,0.477,0.194,0.472,0.177,0.466,0.159,0.46,0.142,0.452,0.125,0.444,0.125,0.444]],"6":[[0.415,0.502,0.415,0.502,0.395,0.5,0.377,0.497,0.36,0.49,0.346,0.482,0.332,0.47,0.321,0.457,0.311,0.441,0.302,0.422,0.296,0.402,0.292,0.379,0.289,0.354,0.288,0.327,0.288,0.327,0.289,0.3,0.292,0.275,0.296,0.252,0.302,0.232,0.311,0.213,0.321,0.197,0.332,0.184,0.346,0.172,0.36,0.164,0.377,0.157,0.395,0.154,0.415,0.152,0.415,0.152,0.435,0.154,0.453,0.157,0.47,0.164,0.485,0.172,0.498,0.184,0.51,0.197,0.52,0.213,0.529,0.232,0.535,0.252,0.54,0.275,0.543,0.3,0.544,0.327,0.544,0.327,0.543,0.354,0.54,0.379,0.535,0.401,0.529,0.422,0.52,0.44,0.51,0.456,0.498,0.47,0.485,0.482,0.47,0.49,0.453,0.497,0.435,0.5,0.415,0.502],[0.665,0.96,0.665,0.96,0.665,0.787,0.648,0.796,0.631,0.805,0.615,0.812,0.599,0.819,0.583,0.825,0.567,0.831,0.552,0.835,0.536,0.839,0.521,0.841,0.506,0.843,0.492,0.845,0.477,0.845,0.477,0.845,0.444,0.843,0.414,0.837,0.386,0.828,0.361,0.814,0.339,0.797,0.32,0.776,0.303,0.751,0.29,0.722,0.279,0.69,0.271,0.654,0.266,0.614,0.263,0.571,0.263,0.571,0.274,0.584,0.285,0.596,0.298,0.607,0.311,0.617,0.326,0.626,0.341,0.634,0.357,0.64,0.374,0.645,0.392,0.649,0.411,0.652,0.431,0.654,0.452,0.655,0.452,0.655,0.494,0.652,0.532,0.645,0.567,0.634,0.599,0.618,0.628,0.597,0.653,0.572,0.675,0.543,0.693,0.51,0.707,0.473,0.716,0.432,0.722,0.387,0.724,0.339,0.724,0.339,0.722,0.287,0.715,0.239,0.704,0.195,0.689,0.155,0.669,0.12,0.645,0.088,0.616,0.061,0.584,0.038,0.549,0.021,0.509,0.009,0.467,0.001,0.42,-0.001,0.42,-0.001,0.364,0.002,0.313,0.012,0.268,0.028,0.228,0.051,0.194,0.081,0.164,0.117,0.14,0.16,0.12,0.212,0.105,0.271,0.093,0.339,0.087,0.415,0.085,0.498,0.085,0.498,0.087,0.578,0.095,0.651,0.109,0.717,0.128,0.777,0.152,0.829,0.182,0.874,0.217,0.912,0.258,0.943,0.304,0.967,0.355,0.985,0.412,0.995,0.474,0.999,0.474,0.999,0.49,0.998,0.505,0.998,0.52,0.996,0.536,0.994,0.552,0.992,0.568,0.989,0.584,0.986,0.6,0.981,0.616,0.977,0.632,0.972,0.649,0.966,0.665,0.96]],"7":[[0.087,0.815,0.087,0.983,0.697,0.983,0.697,0.848,0.37,0.019,0.176,0.019,0.489,0.815,0.087,0.815]],"8":[[0.398,0.449,0.398,0.449,0.377,0.448,0.358,0.444,0.34,0.439,0.323,0.431,0.308,0.421,0.294,0.408,0.282,0.394,0.273,0.379,0.265,0.361,0.259,0.343,0.256,0.323,0.255,0.301,0.255,0.301,0.256,0.28,0.259,0.26,0.265,0.241,0.273,0.224,0.282,0.209,0.294,0.194,0.308,0.182,0.323,0.172,0.34,0.164,0.358,0.158,0.377,0.155,0.398,0.154,0.398,0.154,0.418,0.155,0.438,0.158,0.456,0.164,0.472,0.172,0.487,0.182,0.501,0.195,0.513,0.209,0.523,0.225,0.531,0.242,0.537,0.261,0.54,0.28,0.541,0.301,0.541,0.301,0.54,0.323,0.537,0.343,0.531,0.361,0.523,0.379,0.514,0.394,0.502,0.408,0.488,0.421,0.473,0.431,0.456,0.439,0.438,0.444,0.418,0.448,0.398,0.449],[0.256,0.529,0.256,0.529,0.233,0.539,0.212,0.549,0.192,0.562,0.175,0.576,0.159,0.591,0.145,0.608,0.134,0.627,0.124,0.647,0.117,0.668,0.111,0.691,0.108,0.715,0.107,0.74,0.107,0.74,0.109,0.779,0.116,0.815,0.127,0.848,0.142,0.878,0.161,0.906,0.185,0.93,0.213,0.952,0.244,0.969,0.277,0.983,0.314,0.992,0.354,0.998,0.398,1,0.398,1,0.441,0.998,0.481,0.992,0.518,0.983,0.552,0.969,0.583,0.952,0.611,0.93,0.635,0.906,0.654,0.878,0.669,0.848,0.68,0.815,0.687,0.779,0.689,0.74,0.689,0.74,0.688,0.715,0.685,0.691,0.679,0.669,0.672,0.648,0.663,0.628,0.651,0.609,0.638,0.592,0.623,0.576,0.605,0.562,0.586,0.55,0.565,0.539,0.542,0.529,0.542,0.529,0.568,0.52,0.592,0.509,0.614,0.495,0.634,0.479,0.651,0.462,0.668,0.442,0.681,0.42,0.693,0.397,0.701,0.372,0.708,0.346,0.711,0.319,0.713,0.29,0.713,0.29,0.71,0.245,0.704,0.204,0.692,0.167,0.676,0.133,0.656,0.102,0.631,0.076,0.601,0.052,0.568,0.034,0.531,0.019,0.491,0.008,0.446,0.002,0.398,0,0.398,0,0.349,0.002,0.305,0.008,0.264,0.019,0.228,0.034,0.194,0.052,0.165,0.076,0.14,0.102,0.12,0.133,0.104,0.167,0.092,0.204,0.086,0.245,0.083,0.29,0.083,0.29,0.085,0.319,0.088,0.346,0.095,0.372,0.104,0.397,0.115,0.42,0.129,0.442,0.145,0.462,0.164,0.48,0.184,0.496,0.206,0.509,0.23,0.52,0.256,0.529],[0.276,0.725,0.276,0.725,0.277,0.707,0.28,0.69,0.284,0.674,0.291,0.66,0.299,0.647,0.309,0.635,0.32,0.625,0.333,0.616,0.347,0.61,0.363,0.605,0.38,0.603,0.398,0.602,0.398,0.602,0.416,0.603,0.433,0.605,0.448,0.61,0.463,0.616,0.476,0.625,0.487,0.635,0.497,0.647,0.505,0.66,0.512,0.674,0.516,0.69,0.519,0.707,0.52,0.725,0.52,0.725,0.519,0.743,0.516,0.76,0.512,0.775,0.505,0.789,0.497,0.802,0.487,0.814,0.476,0.824,0.463,0.832,0.448,0.838,0.433,0.843,0.416,0.845,0.398,0.846,0.398,0.846,0.38,0.845,0.363,0.843,0.348,0.838,0.334,0.832,0.321,0.823,0.309,0.813,0.299,0.802,0.291,0.789,0.285,0.775,0.28,0.759,0.277,0.743,0.276,0.725]],"9":[[0.131,0.032,0.131,0.032,0.131,0.205,0.148,0.196,0.165,0.187,0.181,0.179,0.197,0.173,0.213,0.167,0.229,0.161,0.244,0.157,0.26,0.154,0.275,0.151,0.29,0.149,0.304,0.148,0.319,0.147,0.319,0.147,0.352,0.149,0.382,0.155,0.409,0.164,0.434,0.178,0.456,0.195,0.475,0.216,0.492,0.241,0.506,0.269,0.517,0.302,0.525,0.338,0.53,0.378,0.533,0.422,0.533,0.422,0.522,0.408,0.511,0.396,0.498,0.385,0.485,0.375,0.47,0.366,0.455,0.359,0.439,0.352,0.422,0.347,0.404,0.343,0.385,0.34,0.364,0.338,0.343,0.338,0.343,0.338,0.302,0.34,0.263,0.347,0.228,0.358,0.197,0.374,0.168,0.395,0.143,0.42,0.121,0.449,0.103,0.482,0.089,0.519,0.08,0.56,0.074,0.605,0.072,0.653,0.072,0.653,0.074,0.705,0.08,0.753,0.092,0.796,0.107,0.836,0.127,0.872,0.151,0.903,0.179,0.93,0.211,0.952,0.247,0.969,0.286,0.982,0.329,0.989,0.376,0.992,0.376,0.992,0.432,0.988,0.482,0.979,0.528,0.962,0.568,0.939,0.602,0.91,0.632,0.874,0.656,0.83,0.676,0.779,0.691,0.72,0.703,0.652,0.709,0.577,0.711,0.493,0.711,0.493,0.709,0.413,0.701,0.341,0.687,0.275,0.668,0.216,0.644,0.164,0.614,0.118,0.579,0.08,0.538,0.049,0.492,0.025,0.441,0.007,0.384,-0.003,0.321,-0.006,0.321,-0.006,0.306,-0.006,0.291,-0.005,0.276,-0.004,0.26,-0.002,0.244,0,0.228,0.003,0.212,0.007,0.196,0.011,0.18,0.015,0.164,0.02,0.147,0.026,0.131,0.032],[0.381,0.497,0.381,0.497,0.401,0.498,0.419,0.502,0.435,0.508,0.45,0.517,0.463,0.528,0.475,0.542,0.485,0.558,0.493,0.576,0.499,0.597,0.504,0.62,0.507,0.645,0.507,0.672,0.507,0.672,0.507,0.699,0.504,0.724,0.499,0.747,0.493,0.767,0.485,0.785,0.475,0.801,0.463,0.815,0.45,0.826,0.435,0.835,0.419,0.841,0.401,0.845,0.381,0.846,0.381,0.846,0.361,0.845,0.343,0.841,0.326,0.835,0.311,0.826,0.298,0.815,0.286,0.801,0.276,0.785,0.267,0.767,0.261,0.747,0.256,0.724,0.253,0.699,0.252,0.672,0.252,0.672,0.253,0.645,0.256,0.62,0.261,0.597,0.267,0.577,0.276,0.558,0.286,0.542,0.298,0.528,0.311,0.517,0.326,0.508,0.343,0.502,0.361,0.498,0.381,0.497]]}};
+  function roomiest(ex) { // the point deepest inside the piece, and how far it is from the edge
+    const rings = [ex.outer, ...ex.holes]; let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of ex.outer) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    let best = null, bd = -1; const n = 28;
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+      const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * j / n;
+      if (!pointInRing(x, y, ex.outer) || ex.holes.some(h => pointInRing(x, y, h))) continue;
+      const d = Math.min(...rings.map(r => distToRing(x, y, r))); if (d > bd) { bd = d; best = [x, y]; }
+    }
+    return best ? { at: best, room: bd } : null;
+  }
+  // where and how large a number fits on a piece: { H, at, turn }, searching from size `top` down
+  function numberFit(text, ex, top) {
+    const keep = exPolysFrom(offset([ex.outer, ...ex.holes], -0.8, 'round')); // stay 0.8 mm inside the piece
+    if (!keep.length) return null;
+    const inKeep = (x, y) => keep.some(k => pointInRing(x, y, k.outer) && !k.holes.some(h => pointInRing(x, y, h)));
+    const n = text.length, adv = MONO.adv, spot = roomiest(ex); if (!spot) return null;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of ex.outer) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const cand = []; const g = 26;
+    for (let i = 0; i <= g; i++) for (let j = 0; j <= g; j++) { const x = x0 + (x1 - x0) * i / g, y = y0 + (y1 - y0) * j / g; if (inKeep(x, y)) cand.push([x, y, Math.hypot(x - spot.at[0], y - spot.at[1])]); }
+    cand.sort((a, b) => a[2] - b[2]);
+    // the largest size (from `top`, at most 5.5 mm, down to 2.5 mm tall) at which the whole number fits somewhere
+    const start = Math.min(5.5, top || 5.5);
+    const largest = turn => {
+      for (let H = start; H >= 2.5 - 1e-9; H -= 0.25) {
+        const bw = n * adv * H / 2, bh = H / 2, hw = turn ? bh : bw, hh = turn ? bw : bh;
+        const fits = (cx, cy) => { for (let k = 0; k <= 8; k++) { const t = k / 8, xs = cx - hw + 2 * hw * t, ys = cy - hh + 2 * hh * t;
+          if (!inKeep(xs, cy - hh) || !inKeep(xs, cy + hh) || !inKeep(cx - hw, ys) || !inKeep(cx + hw, ys)) return false; } return true; };
+        const at = cand.find(c => fits(c[0], c[1]));
+        if (at) return { H, at, turn };
+      }
+      return null;
+    };
+    const up = largest(false);
+    if (top) { // a set size: upright if it fits that way, otherwise turned
+      if (up && up.H >= start - 1e-9) return up;
+      const side = largest(true);
+      return !up ? side : !side ? up : side.H > up.H ? side : up;
+    }
+    // free size: upright unless turning it lets the number be clearly (25 %) larger
+    const side = !up || up.H < 4 ? largest(true) : null;
+    return up && (!side || up.H >= side.H * 0.8) ? up : side;
+  }
+  // the number's outline, laid out at a spot found by numberFit
+  function engraving(text, pick) {
+    const n = text.length, adv = MONO.adv;
+    if (pick) {
+      const { H, turn } = pick, [cx, cy] = pick.at, totW = n * adv * H, c = new CL.Clipper();
+      [...text].forEach((ch, k) => {
+        for (const flat of MONO.g[ch] || []) {
+          const path = [];
+          for (let i = 0; i < flat.length; i += 2) {
+            // laid out left to right around the centre, turned if needed, then mirrored in x so it reads from below
+            let dx = -totW / 2 + (k * adv + flat[i]) * H, dy = -H / 2 + flat[i + 1] * H;
+            if (turn) [dx, dy] = [-dy, dx];
+            path.push([cx - dx, cy + dy]);
+          }
+          c.AddPath(toCL(path), CL.PolyType.ptSubject, true);
+        }
+      });
+      const sol = new CL.Paths(); c.Execute(CL.ClipType.ctUnion, sol, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero);
+      return sol.map(fromCL);
+    }
+    return null; // too small to read or print: this piece stays plain
   }
 
   // ---------- jigsaw ----------
@@ -649,6 +827,7 @@
   // hf: {heights Float32Array, N, sizeKm}
   function buildModel(p, hf, font) {
     const W = p.widthMm, N = hf.N, sizeKm = hf.sizeKm;
+    let numH = 0; // height of the engraved piece numbers, the same on every piece
     const outline = shapeOutline(p.shape, W);
     const H = p.shape === 'hexagon' ? W * Math.sqrt(3) / 2 : W;
     const mmPerM = W / (sizeKm * 1000);
@@ -724,21 +903,47 @@
           u.sort((x, y) => exArea(y) - exArea(x)); best.ex = u[0];
         }
       }
-      let n = 0;
+      // 1. final outline of every piece
+      const outs = [];
       for (const q of big) {
         const shr = exPolysFrom(offset([q.ex.outer, ...q.ex.holes], -p.gapMm / 2, 'round'));
         shr.sort((x, y) => exArea(y) - exArea(x));
-        if (!shr.length) continue;
-        let tris = [], ring = shr[0].outer;
-        try { solid({ outer: densify(shr[0].outer, Math.max(0.6, step * 1.5)), holes: shr[0].holes }, topZ, floorZ, step, tris); }
-        catch (e) {
-          // a pinch where two tabs nearly touch: open the outline slightly and retry
-          const fix = exPolysFrom(offset(offset([shr[0].outer, ...shr[0].holes], -0.15, 'round'), 0.15, 'round'));
-          fix.sort((x, y) => exArea(y) - exArea(x)); tris = []; ring = fix[0].outer;
-          solid({ outer: densify(fix[0].outer, Math.max(0.6, step * 1.5)), holes: fix[0].holes }, topZ, floorZ, step, tris);
-        }
-        parts.push({ name: `Piece ${++n}`, role: 'terrain', tris: new Float32Array(tris), cell: [q.cell.i, q.cell.j], ring });
+        if (shr.length) outs.push({ q, ex: shr[0] });
       }
+      // 2. number them in reading order (squares row by row; circles and hexagons centre first, then ring by ring
+      //    clockwise from 12 o'clock). Files, the piece map and the engraved numbers all use this.
+      const cen = r => { let x = 0, y = 0, A = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const c = r[j][0] * r[i][1] - r[i][0] * r[j][1]; A += c; x += (r[j][0] + r[i][0]) * c; y += (r[j][1] + r[i][1]) * c; } return A ? [x / (3 * A), y / (3 * A)] : r[0]; };
+      const cw0 = Math.min(grid.cellW || 1e9, grid.cellH || 1e9);
+      outs.forEach(o => { o.c = cen(o.ex.outer); });
+      if (p.shape === 'square') outs.sort((a, b) => Math.round(b.c[1] / cw0) - Math.round(a.c[1] / cw0) || a.c[0] - b.c[0]);
+      else { const key = o => [o.q.cell.j, o.q.cell.j === 0 ? -1 : (Math.atan2(o.c[0], o.c[1]) + 2 * Math.PI) % (2 * Math.PI)]; outs.forEach(o => o.k = key(o)); outs.sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1]); }
+      // 3. one number size for the whole puzzle: the largest that fits on every piece that can take a number
+      if (p.pieceNumbers) {
+        outs.forEach((o, k) => { o.fit = numberFit(String(k + 1), o.ex); });
+        const hs = outs.filter(o => o.fit).map(o => o.fit.H);
+        if (hs.length) numH = Math.min(...hs);
+      }
+      // 4. solids, with the number engraved into the underside if asked
+      outs.forEach((o, k) => {
+        const num = k + 1;
+        let ex = o.ex, tris = [];
+        const build = e => {
+          tris = [];
+          const e2 = { outer: densify(e.outer, Math.max(0.6, step * 1.5)), holes: e.holes };
+          const eng = numH ? engraving(String(num), e === o.ex && o.fit && o.fit.H === numH ? o.fit : numberFit(String(num), e, numH)) : null;
+          if (!eng) { solid(e2, topZ, floorZ, step, tris); return; }
+          // a thin slab with the number cut out of it, and the rest of the piece on top (sunk 0.05 mm into the slab)
+          solid(e2, topZ, floorZ + ENGRAVE_MM - 0.05, step, tris);
+          for (const s2 of boolOp(CL.ClipType.ctDifference, [e.outer, ...e.holes], eng)) solid(s2, floorZ + ENGRAVE_MM, floorZ, 0, tris);
+        };
+        try { build(ex); }
+        catch (err) {
+          // a pinch where two tabs nearly touch: open the outline slightly and retry
+          const fix = exPolysFrom(offset(offset([ex.outer, ...ex.holes], -0.15, 'round'), 0.15, 'round'));
+          fix.sort((x, y) => exArea(y) - exArea(x)); ex = fix[0]; build(ex);
+        }
+        parts.push({ name: `Piece ${num}`, num, role: 'terrain', tris: new Float32Array(tris), cell: [o.q.cell.i, o.q.cell.j], ring: ex.outer });
+      });
     } else {
       const tOut = p.separate ? densify(offset([outline], -p.gapMm / 2, join)[0], Math.max(0.6, step * 1.5)) : outlineD;
       solid({ outer: tOut, holes: [] }, topZ, floorZ, step, terrain);
@@ -763,15 +968,17 @@
       frameInner.push(hole);
     }
     const ft = [];
+    const knurl = p.knurl ? { pitch: 1.6, depth: 0.45 } : null; // the criss-cross grip texture on the outer wall
     if (backed) {
       // a tray: full-thickness floor under the pocket, rim around it
       const loopHoles = frameInner.slice(pocketRings.length);
       const body = boolOp(CL.ClipType.ctDifference, frameOuter, loopHoles);
       const pocket = pocketRings.map(r => ccw(cleanRing(densify(r, 1.2), 0.02)));
-      for (const e of body) traySolid({ outer: ccw(cleanRing(densify(e.outer, 1.2), 0.02)), holes: e.holes.map(h => cw(cleanRing(densify(h, 1.2), 0.02))) }, pocket, frameTop, floorZ, ft);
+      const floorKnurl = p.floorKnurl && p.product === 'puzzle' && floorZ >= 1.25 ? { pitch: 1.6, depth: 0.45 } : null; // knurled floor for puzzle trays
+      for (const e of body) traySolid({ outer: ccw(cleanRing(densify(e.outer, 1.2), 0.02)), holes: e.holes.map(h => cw(cleanRing(densify(h, 1.2), 0.02))) }, pocket, frameTop, floorZ, ft, knurl, floorKnurl);
     } else {
       const frameEx = boolOp(CL.ClipType.ctDifference, frameOuter, frameInner);
-      for (const e of frameEx) solid({ outer: densify(e.outer, 1.2), holes: e.holes.map(h => densify(h, 1.2)) }, frameTop, 0, 0, ft);
+      for (const e of frameEx) solid({ outer: densify(e.outer, 1.2), holes: e.holes.map(h => densify(h, 1.2)) }, frameTop, 0, 0, ft, knurl);
     }
     parts.push({ name: 'Frame', role: 'frame', tris: new Float32Array(ft) });
     }
@@ -796,7 +1003,7 @@
         } else parts.push({ name: 'Lettering', role: 'text', tris: new Float32Array(tt) });
       }
     }
-    return { parts, hMin, hMax, reliefMm, mmPerM, frameTop, grid, floorZ };
+    return { parts, hMin, hMax, reliefMm, mmPerM, frameTop, grid, floorZ, numberMm: numH };
   }
 
   // Move puzzle pieces apart so every tab clears its socket. Returns new parts and the layout size.

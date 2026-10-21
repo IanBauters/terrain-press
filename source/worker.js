@@ -115,15 +115,8 @@ function measure(parts) {
 }
 // number puzzle pieces in reading order: squares row by row; circles and hexagons centre first, then ring by ring
 // clockwise from 12 o'clock. The guide's piece map and the single-piece files share this numbering.
-function numberPieces(model, p) {
-  const pcs = model.parts.filter(o => o.cell);
-  const cw = model.grid ? Math.min(model.grid.cellW || 1e9, model.grid.cellH || 1e9) : p.widthMm / 5;
-  if (p.shape === 'square') pcs.sort((a, b) => Math.round(ctr(b.ring)[1] / cw) - Math.round(ctr(a.ring)[1] / cw) || ctr(a.ring)[0] - ctr(b.ring)[0]);
-  else {
-    const key = o => { const c = ctr(o.ring); return [o.cell[1], o.cell[1] === 0 ? -1 : (Math.atan2(c[0], c[1]) + 2 * Math.PI) % (2 * Math.PI)]; };
-    pcs.sort((a, b) => { const ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; });
-  }
-  return pcs.map((o, k) => ({ ...o, name: 'Piece ' + (k + 1) }));
+function numberPieces(model, p) { // the model builder numbers the pieces; files and the map follow its numbers
+  return model.parts.filter(o => o.cell).sort((a, b) => a.num - b.num);
 }
 
 function exportFiles(model, p, x) {

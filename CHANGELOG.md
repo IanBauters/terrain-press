@@ -2,6 +2,18 @@
 
 What changed in each update, in plain words. The newest is at the top.
 
+## 1.2.0 · 21 October 2026
+
+### Added
+- **Puzzle pieces can have their number engraved on the underside.** Turn a piece over to see which one it is, handy for a lost piece or a reprint.
+  - The numbers match the single-piece files and the piece map.
+  - They're cut into the bottom, so the piece still lies flat.
+  - Every number in a puzzle is the same size, in a clear typewriter-style font. Very small pieces may stay without a number.
+- **Knurled outer edge.** A criss-cross grip texture around the outside of the frame.
+- **Knurled tray floor for puzzles.** The same criss-cross texture on the floor of the tray hides print marks, and the pieces rest on its tips so they lift out more easily.
+
+All three are on by default, and each has its own switch to turn it off. The piece shapes haven't changed, so puzzles printed before this update still fit new pieces.
+
 ## 1.1.0 · 15 October 2026
 
 ### Added

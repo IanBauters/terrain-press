@@ -20,6 +20,8 @@ There are services that charge per download for exactly this kind of file. The e
   - A large centre piece keeps the landmark whole.
   - A closed-back tray holds the pieces.
   - The pieces come spread apart on one plate, and also as one STL per piece with a numbered map, so a lost piece is a single reprint.
+  - Each piece can have its number engraved underneath, and the tray floor can get a knurled texture so pieces lift out easily.
+- **A knurled outer edge** for frames and trays, a criss-cross grip texture.
 - **A print guide (PDF) with every download**: settings, filament estimates and a page per print plate.
 - **Settings**: relief exaggeration, rim height, base thickness, clearances, three lettering styles and mesh detail.
 

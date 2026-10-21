@@ -205,6 +205,7 @@ body { background: var(--tp-bg); color: var(--tp-ink); --bs-body-bg: var(--tp-bg
         <div class="col-6" id="pieces-wrap"><label class="tp-label" for="pieces">Pieces across</label><input class="form-control form-control-sm tp-num" id="pieces" type="number" step="1" min="2" max="12" value="5"></div>
         <div class="col-6"><label class="tp-label" for="gap">Clearance mm</label><input class="form-control form-control-sm tp-num" id="gap" type="number" step="0.05" min="0.1" max="0.6" value="0.3"></div>
       </div>
+      <div class="form-check form-switch" id="numbers-wrap"><input class="form-check-input" type="checkbox" role="switch" id="piece-numbers" checked><label class="form-check-label" for="piece-numbers">Piece number engraved on the underside</label></div>
       <div class="row g-2" id="spread-opts"><div class="col-6"><label class="tp-label" for="spread-gap">Space between pieces mm</label><input class="form-control form-control-sm tp-num" id="spread-gap" type="number" step="0.5" min="1" max="15" value="3"></div></div>
       <p class="tp-hint" id="model-hint"></p>
     </section>
@@ -219,6 +220,8 @@ body { background: var(--tp-bg); color: var(--tp-ink); --bs-body-bg: var(--tp-bg
       <div id="back-opts" class="d-flex flex-column gap-2">
         <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="back" checked><label class="form-check-label" for="back">Closed back, so the frame is a tray you can carry</label></div>
         <div class="row g-2" id="back-row"><div class="col-6"><label class="tp-label" for="back-mm">Back thickness mm</label><input class="form-control form-control-sm tp-num" id="back-mm" type="number" step="0.2" min="0.8" max="4" value="1.6"></div></div>
+        <div class="form-check form-switch" id="floor-knurl-wrap"><input class="form-check-input" type="checkbox" role="switch" id="floor-knurl" checked><label class="form-check-label" for="floor-knurl">Knurled tray floor: hides print marks, pieces lift out easier</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="knurl" checked><label class="form-check-label" for="knurl">Knurled outer edge, a criss-cross grip texture</label></div>
       </div>
       <div id="letter-opts" class="d-flex flex-column gap-2">
         <div class="btn-group tp-seg" role="group" aria-label="Lettering style">
@@ -290,7 +293,7 @@ body { background: var(--tp-bg); color: var(--tp-ink); --bs-body-bg: var(--tp-bg
 
 <script src="lib/three.min.js"></script>
 <script src="lib/OrbitControls.js"></script>
-<script>const BUILD = '089356b26c'; // changes whenever worker.js or core.js change, so browsers never run stale code
+<script>const BUILD = 'b8cf5ea7fa'; // changes whenever worker.js or core.js change, so browsers never run stale code
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -479,7 +482,7 @@ function params(step) {
     shape: state.shape, product, widthMm: +$('width').value, exag: exFromSlider(+$('exag').value),
     baseMm: clamp(+$('base').value, 1, 8, 2), frameMm: clamp(+$('frame').value, 4, 14, 7), rimMm: clamp(+$('rim').value, 0.5, 30, 3), rimAuto: $('rim-auto').checked, textMm: 0.8,
     textTop: $('t-top').value.trim(), textBottom: $('t-bottom').value.trim(),
-    pieces: Math.round(clamp(+$('pieces').value, 2, 12, 5)), gapMm: clamp(+$('gap').value, 0.1, 0.6, 0.3),
+    pieces: Math.round(clamp(+$('pieces').value, 2, 12, 5)), knurl: $('knurl').checked, floorKnurl: $('floor-knurl').checked, pieceNumbers: $('piece-numbers').checked, gapMm: clamp(+$('gap').value, 0.1, 0.6, 0.3),
     separate: product === 'ornament' && border !== 'none' && $('separate').checked,
     loop: product === 'ornament' && border !== 'none' && $('loop').checked,
     stepMm: step, border, mergeText: $('merge').checked, back: $('back').checked, backMm: clamp(+$('back-mm').value, 0.8, 4, 1.6),
@@ -770,8 +773,8 @@ function syncMode() {
   const orn = state.product === 'ornament', framed = state.border !== 'none', sep = orn && framed && $('separate').checked;
   $('orn-opts').hidden = !orn || !framed; $('loop-wrap').hidden = !orn || !framed;
   $('fit-row').hidden = !(state.product === 'puzzle' || sep); $('pieces-wrap').hidden = state.product !== 'puzzle';
-  $('spread-opts').hidden = state.product !== 'puzzle';
-  $('back-opts').hidden = !framed; $('back-row').hidden = !$('back').checked;
+  $('spread-opts').hidden = $('numbers-wrap').hidden = state.product !== 'puzzle';
+  $('back-opts').hidden = !framed; $('back-row').hidden = !$('back').checked; $('floor-knurl-wrap').hidden = state.product !== 'puzzle' || !$('back').checked;
   $('letter-opts').hidden = state.border !== 'lettered';
   $('frame').disabled = $('rim').disabled = !framed; $('rim-auto-wrap').hidden = !framed;
   $('loop-note').hidden = !(orn && state.border === 'lettered' && $('loop').checked);
@@ -783,7 +786,7 @@ function syncMode() {
   $('export-note').textContent = (state.product === 'puzzle' || sep ? 'A .zip with one file per print plate (STL and 3MF)' : 'A .zip with STL and multicolour 3MF files') + (state.product === 'puzzle' ? ', every piece on its own and a print guide.' : ' and a print guide.');
 }
 document.querySelectorAll('input[type=radio]').forEach(el => el.addEventListener('change', () => { syncMode(); if (el.name === 'shape' && globe) globe.refresh(); if (el.name !== 'detail') schedule(); }));
-['separate', 'loop', 'back', 'merge', 'rim-auto'].forEach(id => $(id).addEventListener('change', () => { syncMode(); schedule(); }));
+['separate', 'loop', 'back', 'merge', 'rim-auto', 'knurl', 'floor-knurl', 'piece-numbers'].forEach(id => $(id).addEventListener('change', () => { syncMode(); schedule(); }));
 ['base', 'frame', 'rim', 'pieces', 'gap', 'spread-gap', 'back-mm', 't-top', 't-bottom'].forEach(id => $(id).addEventListener('input', () => schedule()));
 $('width').addEventListener('input', () => { $('o-width').textContent = $('width').value + ' mm'; schedule(); });
 $('exag').addEventListener('input', () => { $('o-exag').textContent = exFromSlider(+$('exag').value) + '×'; schedule(); });
