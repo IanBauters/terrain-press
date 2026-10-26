@@ -910,22 +910,38 @@
         shr.sort((x, y) => exArea(y) - exArea(x));
         if (shr.length) outs.push({ q, ex: shr[0] });
       }
-      // 2. number them in reading order (squares row by row; circles and hexagons centre first, then ring by ring
-      //    clockwise from 12 o'clock). Files, the piece map and the engraved numbers all use this.
+      // 2. put them in a fixed order (squares row by row; circles and hexagons centre first, then ring by ring clockwise
+      //    from 12 o'clock), then hand out the numbers shuffled, so a number says nothing about where a piece goes.
+      //    The shuffle follows the puzzle's seed, so the same puzzle always gets the same numbers. Files, the piece map
+      //    and the engraved numbers all use them.
       const cen = r => { let x = 0, y = 0, A = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const c = r[j][0] * r[i][1] - r[i][0] * r[j][1]; A += c; x += (r[j][0] + r[i][0]) * c; y += (r[j][1] + r[i][1]) * c; } return A ? [x / (3 * A), y / (3 * A)] : r[0]; };
       const cw0 = Math.min(grid.cellW || 1e9, grid.cellH || 1e9);
       outs.forEach(o => { o.c = cen(o.ex.outer); });
       if (p.shape === 'square') outs.sort((a, b) => Math.round(b.c[1] / cw0) - Math.round(a.c[1] / cw0) || a.c[0] - b.c[0]);
       else { const key = o => [o.q.cell.j, o.q.cell.j === 0 ? -1 : (Math.atan2(o.c[0], o.c[1]) + 2 * Math.PI) % (2 * Math.PI)]; outs.forEach(o => o.k = key(o)); outs.sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1]); }
+      {
+        const n = outs.length, rad = 1.5 * Math.sqrt(outs.reduce((t, o) => t + exArea(o.ex), 0) / Math.max(1, n));
+        const near = []; // pairs of pieces that (roughly) touch
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (Math.hypot(outs[i].c[0] - outs[j].c[0], outs[i].c[1] - outs[j].c[1]) < rad) near.push([i, j]);
+        const r = rng(Math.imul(p.seed || 1, 2654435761) + n), base = outs.map((_, k) => k + 1);
+        let best = null, bestBad = Infinity;
+        for (let t = 0; t < 300 && bestBad > 0; t++) {
+          const perm = base.slice();
+          for (let k = n - 1; k > 0; k--) { const m = Math.floor(r() * (k + 1)); [perm[k], perm[m]] = [perm[m], perm[k]]; }
+          const bad = near.filter(([i, j]) => Math.abs(perm[i] - perm[j]) === 1).length + perm.filter((v, k) => v === k + 1).length;
+          if (bad < bestBad) { best = perm; bestBad = bad; }
+        }
+        outs.forEach((o, k) => { o.num = best[k]; });
+      }
       // 3. one number size for the whole puzzle: the largest that fits on every piece that can take a number
       if (p.pieceNumbers) {
-        outs.forEach((o, k) => { o.fit = numberFit(String(k + 1), o.ex); });
+        outs.forEach(o => { o.fit = numberFit(String(o.num), o.ex); });
         const hs = outs.filter(o => o.fit).map(o => o.fit.H);
         if (hs.length) numH = Math.min(...hs);
       }
       // 4. solids, with the number engraved into the underside if asked
-      outs.forEach((o, k) => {
-        const num = k + 1;
+      outs.forEach(o => {
+        const num = o.num;
         let ex = o.ex, tris = [];
         const build = e => {
           tris = [];

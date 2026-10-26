@@ -2,6 +2,13 @@
 
 What changed in each update, in plain words. The newest is at the top.
 
+## 1.2.1 · 26 October 2026
+
+### Fixed
+- **The numbers under the puzzle pieces gave away where each piece goes.** They counted in order around the puzzle, so you could solve it just by reading the backs. The numbers are now shuffled, and pieces that sit next to each other never get consecutive numbers.
+  - The same puzzle always gets the same numbers, so a reprinted piece still matches its single-piece file and the piece map.
+  - **Download a new piece map** if you printed a puzzle with the previous version: its numbers no longer match the new files.
+
 ## 1.2.0 · 21 October 2026
 
 ### Added
