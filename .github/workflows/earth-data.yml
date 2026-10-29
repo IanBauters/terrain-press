@@ -1,0 +1,40 @@
+# Temporary: builds the Earth tiles on GitHub's machines (they can reach NOAA) and commits them to this branch.
+name: Build Earth data
+on:
+  push:
+    branches: [earth-data]
+    paths: ['tools/earth_data.py', '.github/workflows/earth-data.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install numpy scipy rasterio pillow
+      - name: Download ETOPO 2022 (60 arc-second surface)
+        run: |
+          base=https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s
+          for u in "$base/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif" \
+                   "$base/60s_surface_elev_netcdf/ETOPO_2022_v1_60s_N90W180_surface.nc"; do
+            echo "trying $u"
+            if curl -fL --retry 3 --retry-delay 10 -o "etopo.${u##*.}" "$u"; then echo "got $u"; break; fi
+          done
+          ls -la etopo.* || { echo "listing:"; curl -sL "$base/60s_surface_elev_gtif/" | grep -o 'href="[^"]*"' | head -40; exit 1; }
+      - name: Convert
+        run: python tools/earth_data.py "$(ls etopo.* | head -1)" site/data/earth tools/earth_samples
+      - name: Check that browsers may load AWS Terrain Tiles
+        run: |
+          curl -sS -D - -o /dev/null -H "Origin: https://ianbauters.github.io" \
+            https://s3.amazonaws.com/elevation-tiles-prod/terrarium/10/533/356.png | tee tools/earth_samples/cors.txt
+      - name: Commit the results to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add site/data/earth tools/earth_samples
+          git commit -m "Earth data from ETOPO 2022 (generated)"
+          git push
