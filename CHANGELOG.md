@@ -2,6 +2,11 @@
 
 What changed in each update, in plain words. The newest is at the top.
 
+## 1.3.1 · 29 October 2026
+
+### Fixed
+- **Zooming in close on the 3D preview could show walls that aren't in the model.** With tall relief, such as a mountain or a gorge, the camera could slide inside the landscape, so you saw it from underneath with its edges standing up like walls. The camera now always stays above the model, however far you zoom or turn. The print files were never affected.
+
 ## 1.3.0 · 29 October 2026
 
 ### Added

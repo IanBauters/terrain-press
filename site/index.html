@@ -594,7 +594,11 @@ const bench = (() => {
   let grid = null, group = new THREE.Group(); scene.add(group);
   let pendingFrame = false;
   const render = () => { if (pendingFrame) return; pendingFrame = true; requestAnimationFrame(() => { pendingFrame = false; if (!canvas.parentElement.hidden) renderer.render(scene, cam); }); };
-  ctl.addEventListener('change', render);
+  // keep the camera out of the model: the point it orbits never sinks below the model's highest point, and since the
+  // camera can't look up from below that point, it always stays above the landscape
+  let topZ = 4; ctl.minDistance = 20;
+  const keepOut = () => { const dz = topZ - ctl.target.z; if (dz > 0) { ctl.target.z += dz; cam.position.z += dz; } };
+  ctl.addEventListener('change', () => { keepOut(); render(); });
   function theme() {
     scene.background = new THREE.Color(css('--tp-stage') || '#0d1014'); plateMat.color.set(css('--tp-plate') || '#161a20');
     if (grid) { scene.remove(grid); grid.geometry.dispose(); }
@@ -608,21 +612,22 @@ const bench = (() => {
   let framed = '';
   function frameTo(size) {
     const k = String(Math.round(size / 20)); if (framed === k) return; framed = k;
-    const d = Math.max(size, 100) / 100; ctl.target.set(0, 0, 4); cam.position.set(0, -190 * d, 170 * d); ctl.update();
+    const d = Math.max(size, 100) / 100; ctl.target.set(0, 0, 4); cam.position.set(0, -190 * d, 170 * d); keepOut(); ctl.update();
   }
   function setParts(parts, spread) {
     scene.remove(group); group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
     group = new THREE.Group();
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxZ = 4;
     for (const p of parts) {
       let g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p.verts, 3)); g.setIndex(new THREE.BufferAttribute(p.idx, 1));
       if (p.role !== 'terrain') g = g.toNonIndexed();          // crisp edges on the frame and letters
       g.computeVertexNormals(); g.computeBoundingBox();
-      const b = g.boundingBox; minX = Math.min(minX, b.min.x); maxX = Math.max(maxX, b.max.x); minY = Math.min(minY, b.min.y); maxY = Math.max(maxY, b.max.y);
+      const b = g.boundingBox; minX = Math.min(minX, b.min.x); maxX = Math.max(maxX, b.max.x); minY = Math.min(minY, b.min.y); maxY = Math.max(maxY, b.max.y); maxZ = Math.max(maxZ, b.max.z);
       const m = new THREE.MeshStandardMaterial({ color: state.colors[p.role], roughness: p.role === 'text' ? 0.45 : 0.88, metalness: p.role === 'text' ? 0.25 : 0 });
       const mesh = new THREE.Mesh(g, m); mesh.castShadow = mesh.receiveShadow = true; mesh.userData.role = p.role; group.add(mesh);
     }
     scene.add(group);
+    topZ = maxZ; keepOut(); ctl.update();
     frameTo(Math.max(maxX - minX, maxY - minY, 100));
     render();
   }
