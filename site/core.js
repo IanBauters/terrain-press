@@ -370,6 +370,24 @@
   function solid(ex, topZ, bottomZ, step, out, knurl) {
     ex = { outer: ccw(cleanRing(ex.outer, 0.02)), holes: ex.holes.map(h => cw(cleanRing(h, 0.02))).filter(h => h.length >= 3) };
     if (ex.outer.length < 3) return;
+    // a terrain surface needs points all along its edge, or a straight side (a square or hexagon) would get its height
+    // from its two corners only: the edge would run as a straight line between them, standing up like a wall where
+    // the landscape is lower. cleanRing dropped those points as collinear, so put them back.
+    // The added points zigzag 0.0001 mm off the line: the triangulator can't take three points exactly in a row.
+    if (typeof topZ === 'function') {
+      const seg = Math.max(0.6, (step || 1) * 1.5);
+      const fill = ring => {
+        const out = [];
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i], b = ring[(i + 1) % ring.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.ceil(L / seg);
+          out.push(a);
+          const nx = -(b[1] - a[1]) / (L || 1), ny = (b[0] - a[0]) / (L || 1);
+          for (let k = 1; k < n; k++) { const t = k / n, e = (k % 2 ? 1 : -1) * 1e-4; out.push([a[0] + (b[0] - a[0]) * t + nx * e, a[1] + (b[1] - a[1]) * t + ny * e]); }
+        }
+        return out;
+      };
+      ex = { outer: fill(ex.outer), holes: ex.holes.map(fill) };
+    }
     let kn = null; if (knurl) { kn = knurlRing(ex.outer, knurl.pitch); ex.outer = kn.pts; }
     const tz = typeof topZ === 'function' ? topZ : () => topZ;
     let tris;

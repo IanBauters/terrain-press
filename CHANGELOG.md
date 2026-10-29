@@ -2,6 +2,13 @@
 
 What changed in each update, in plain words. The newest is at the top.
 
+## 1.3.2 · 29 October 2026
+
+### Fixed
+- **Square and hexagon models had straight, wall-like edges.** Along each straight side, the landscape's edge ran as one straight line from corner to corner instead of following the terrain. Where the land was lower than that line, a flat slab stood up like a wall; where it was higher, the edge cut into it. It shows most on steep places like the Matterhorn, but every square or hexagon model on every world had it. Puzzle pieces had the same along their straight cuts. Every edge now follows the terrain.
+  - **Reprint square and hexagon models** made before this update if the edges bother you. Circle ornaments were not affected.
+  - A puzzle piece printed now still fits an older puzzle; only the height of its edges is slightly different.
+
 ## 1.3.1 · 29 October 2026
 
 ### Fixed
