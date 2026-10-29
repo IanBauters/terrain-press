@@ -1,0 +1,33 @@
+# Temporary: fetch a few AWS Terrain Tiles around a place, for debugging.
+name: Fetch terrain tiles
+on:
+  push:
+    branches: [earth-data]
+    paths: ['.github/workflows/earth-tiles.yml']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch tiles around Chasteuil
+        run: |
+          python3 - <<'PY'
+          import math, os, urllib.request
+          os.makedirs('tools/tiles_chasteuil', exist_ok=True)
+          la, lo = 43.8369, 6.4227
+          for z, r in ((12, 2), (13, 3), (14, 5)):
+              n = 2 ** z
+              x = int((lo + 180) / 360 * n)
+              y = int((1 - math.log(math.tan(math.radians(la)) + 1 / math.cos(math.radians(la))) / math.pi) / 2 * n)
+              for yy in range(y - r, y + r + 1):
+                  for xx in range(x - r, x + r + 1):
+                      u = f'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{xx}/{yy}.png'
+                      urllib.request.urlretrieve(u, f'tools/tiles_chasteuil/{z}_{xx}_{yy}.png')
+              print(z, x, y)
+          PY
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add tools/tiles_chasteuil && git commit -m "Chasteuil tiles (debug)" && git push
