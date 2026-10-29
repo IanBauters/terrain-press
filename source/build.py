@@ -9,7 +9,7 @@ What it does:
   * trims Bootstrap to the classes the page uses (PurgeCSS) and inlines it
   * inlines app.js into the page and stamps a build hash, so browsers never run stale code
   * copies core.js and worker.js, pointing them at the bundled libraries in site/lib/
-  * copies guide.js (the print guide, loaded when someone downloads)
+  * copies guide.js and poster.js (the print guide and the A4 posters, loaded when someone downloads)
   * copies three.js, OrbitControls, poly2tri, Clipper and jsPDF into site/lib/
 
 Elevation data in site/data/ is not touched; see docs/DATA.md for how it was made.
@@ -35,7 +35,7 @@ def localise(text):
 if not os.path.isdir(NM): sys.exit('Run "npm install" in the repository root first.')
 
 core, worker = read(SRC, 'core.js'), read(SRC, 'worker.js')
-version = hashlib.sha1((worker + core + read(SRC, 'guide.js') + read(SITE, 'data', 'meta.json')).encode()).hexdigest()[:10]
+version = hashlib.sha1((worker + core + read(SRC, 'guide.js') + read(SRC, 'poster.js') + read(SITE, 'data', 'meta.json')).encode()).hexdigest()[:10]
 
 app = read(SRC, 'app.js').replace('__BUILD__', version)
 for key in ('MOON', 'MARS', 'MERCURY'):
@@ -64,6 +64,7 @@ open(os.path.join(SITE, 'index.html'), 'w', encoding='utf-8').write(html)
 open(os.path.join(SITE, 'core.js'), 'w', encoding='utf-8').write(core)
 open(os.path.join(SITE, 'worker.js'), 'w', encoding='utf-8').write(localise(worker))
 open(os.path.join(SITE, 'guide.js'), 'w', encoding='utf-8').write(read(SRC, 'guide.js'))
+open(os.path.join(SITE, 'poster.js'), 'w', encoding='utf-8').write(read(SRC, 'poster.js'))
 os.makedirs(os.path.join(SITE, 'lib'), exist_ok=True)
 for local, pkg in LIBS.values(): shutil.copy(os.path.join(NM, pkg), os.path.join(SITE, local))
 left = [u for u in LIBS if u in html or u in localise(worker)]

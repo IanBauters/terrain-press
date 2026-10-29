@@ -49,7 +49,7 @@ The three lettering styles are glyph-outline subsets converted from these fonts.
 | Space age | Audiowide | © 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI), Reserved Font Name "Audiowide" | [LICENSES/font-Audiowide-OFL-1.1.txt](LICENSES/font-Audiowide-OFL-1.1.txt) |
 | Apollo plaque | Jost | © 2020 The Jost Project Authors | [LICENSES/font-Jost-OFL-1.1.txt](LICENSES/font-Jost-OFL-1.1.txt) |
 | Technical | Orbitron | © 2018 The Orbitron Project Authors | [LICENSES/font-Orbitron-OFL-1.1.txt](LICENSES/font-Orbitron-OFL-1.1.txt) |
-| Engraved piece numbers (digits only) | DejaVu Sans Mono Bold | © 2003 Bitstream, Inc. (Bitstream Vera); DejaVu changes are in the public domain | [LICENSES/font-DejaVuSansMono-Bitstream-Vera.txt](LICENSES/font-DejaVuSansMono-Bitstream-Vera.txt) |
+| Engraved piece numbers (digits) and poster text | DejaVu Sans Mono and DejaVu Sans Mono Bold | © 2003 Bitstream, Inc. (Bitstream Vera); DejaVu changes are in the public domain | [LICENSES/font-DejaVuSansMono-Bitstream-Vera.txt](LICENSES/font-DejaVuSansMono-Bitstream-Vera.txt) |
 
 ## Trademarks
 

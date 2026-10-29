@@ -184,6 +184,103 @@
     for (let i = 0; i < fix.length; i += 2) A[fix[i]] = fix[i + 1];
     return fix.length / 2;
   }
+  // ---------- poster: the place drawn as thin stacked layers ----------
+  // Contour rings of a grid (row 0 = north) at threshold t, in grid units, by marching squares. The grid is padded
+  // with a very low border so every ring closes; rings are unordered and meant for an even-odd fill.
+  function contourRings(A, N, t) {
+    const n = N + 2, V = new Float64Array(n * n).fill(-1e12);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) V[(i + 1) * n + j + 1] = A[i * N + j];
+    const H = (i, j) => i * n + j, Vk = (i, j) => n * n + i * n + j; // horizontal edge (i,j)-(i,j+1), vertical (i,j)-(i+1,j)
+    const adj = new Map(), pos = new Map();
+    const link = (a, b) => { (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); };
+    const pt = (key, i0, j0, i1, j1) => {
+      if (pos.has(key)) return;
+      const a = V[i0 * n + j0], b = V[i1 * n + j1], f = Math.max(0, Math.min(1, (t - a) / (b - a)));
+      pos.set(key, [j0 + (j1 - j0) * f - 1, i0 + (i1 - i0) * f - 1]);
+    };
+    for (let i = 0; i < n - 1; i++) for (let j = 0; j < n - 1; j++) {
+      const tl = V[i * n + j], tr = V[i * n + j + 1], br = V[(i + 1) * n + j + 1], bl = V[(i + 1) * n + j];
+      const c = (tl >= t ? 8 : 0) | (tr >= t ? 4 : 0) | (br >= t ? 2 : 0) | (bl >= t ? 1 : 0);
+      if (c === 0 || c === 15) continue;
+      const T = H(i, j), B = H(i + 1, j), L = Vk(i, j), R = Vk(i, j + 1);
+      const P = { T: () => pt(T, i, j, i, j + 1), B: () => pt(B, i + 1, j, i + 1, j + 1), L: () => pt(L, i, j, i + 1, j), R: () => pt(R, i, j + 1, i + 1, j + 1) };
+      const K = { T, B, L, R };
+      const seg = (a, b) => { P[a](); P[b](); link(K[a], K[b]); };
+      const mid = (tl + tr + br + bl) / 4 >= t;
+      switch (c) {
+        case 1: case 14: seg('L', 'B'); break;
+        case 2: case 13: seg('B', 'R'); break;
+        case 3: case 12: seg('L', 'R'); break;
+        case 4: case 11: seg('T', 'R'); break;
+        case 6: case 9: seg('T', 'B'); break;
+        case 7: case 8: seg('L', 'T'); break;
+        case 5: if (mid) { seg('L', 'T'); seg('B', 'R'); } else { seg('L', 'B'); seg('T', 'R'); } break;
+        case 10: if (mid) { seg('T', 'R'); seg('L', 'B'); } else { seg('L', 'T'); seg('B', 'R'); } break;
+      }
+    }
+    const rings = [], seen = new Set();
+    for (const start of adj.keys()) {
+      if (seen.has(start)) continue;
+      const ring = []; let prev = -1, cur = start;
+      while (cur !== undefined && !seen.has(cur)) {
+        seen.add(cur); ring.push(pos.get(cur));
+        const nb = adj.get(cur), nx = nb[0] !== prev ? nb[0] : nb[1]; prev = cur; cur = nx;
+      }
+      if (ring.length >= 3) rings.push(ring);
+    }
+    return rings;
+  }
+  // Layers for the poster: [{ z (mm), paths (rings, even-odd) }] from the bottom of the base up, clipped to the shape.
+  function posterLayers(hf, p) {
+    const W = p.widthMm, N = hf.N, A = hf.heights, outline = shapeOutline(p.shape, W);
+    const gx = j => -W / 2 + j * W / (N - 1), gy = i => W / 2 - i * W / (N - 1);
+    let hMin = Infinity, hMax = -Infinity;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      if (!pointInRing(gx(j), gy(i), outline) && distToRing(gx(j), gy(i), outline) > W / (N - 1) * 1.5) continue;
+      const h = A[i * N + j]; if (h < hMin) hMin = h; if (h > hMax) hMax = h;
+    }
+    const k = W / (hf.sizeKm * 1000) * p.exag, relief = Math.max(1, hMax - hMin);
+    // a round contour interval giving about 38 lines across the relief
+    const raw = relief / 38, mag = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(v => v >= raw);
+    const baseH = W * 0.045, dzMm = step * k, nBase = Math.max(3, Math.min(10, Math.round(baseH / Math.max(dzMm, 0.6))));
+    const clipTo = rings => {
+      const c = new CL.Clipper(), sol = new CL.Paths();
+      c.AddPaths(rings.map(toCL), CL.PolyType.ptSubject, true); c.AddPath(toCL(outline), CL.PolyType.ptClip, true);
+      c.Execute(CL.ClipType.ctIntersection, sol, CL.PolyFillType.pftEvenOdd, CL.PolyFillType.pftNonZero);
+      return sol.map(fromCL);
+    };
+    const layers = [];
+    for (let b = 0; b < nBase; b++) layers.push({ z: baseH * b / nBase, paths: [outline] });
+    for (let lev = Math.ceil(hMin / step) * step; lev <= hMax; lev += step) {
+      const rings = contourRings(A, N, lev).map(r => r.map(([j, i]) => [gx(j), gy(i)]));
+      const paths = clipTo(rings);
+      if (paths.length) layers.push({ z: baseH + (lev - hMin) * k, paths });
+    }
+    return { layers, outline, W, step, hMin, hMax, baseH, top: baseH + (hMax - hMin) * k };
+  }
+  // Draws the layers on a 2D canvas context (w x h px): an isometric view with a corner towards you, each layer filled
+  // with the paper colour and outlined in ink, bottom first, so higher layers hide what lies behind them.
+  function drawPoster(ctx, P, w, h, col) {
+    const c30 = Math.cos(Math.PI / 6), s30 = 0.5;
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const [x, y] of P.outline) { const u = (x - y) * c30, v = (x + y) * s30; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v + P.top); }
+    const S = Math.min(w * 0.96 / (u1 - u0), h * 0.9 / (v1 - v0)), ox = w / 2 - (u0 + u1) / 2 * S, oy = h / 2 + (v0 + v1) / 2 * S;
+    const X = (x, y) => (x - y) * c30 * S + ox, Y = (x, y, z) => oy - ((x + y) * s30 + z) * S;
+    const trace = (paths, z, dx = 0, dy = 0) => {
+      ctx.beginPath();
+      for (const r of paths) { r.forEach(([x, y], i) => { const a = X(x, y) + dx, b = Y(x, y, z) + dy; i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }); ctx.closePath(); }
+    };
+    ctx.fillStyle = col.paper; ctx.fillRect(0, 0, w, h);
+    // soft shadow on the ground, to the lower right
+    ctx.save(); ctx.shadowColor = col.shadow; ctx.shadowBlur = P.W * S * 0.05; ctx.shadowOffsetX = P.W * S * 0.04; ctx.shadowOffsetY = P.W * S * 0.035;
+    trace([P.outline], 0); ctx.fillStyle = col.shadow; ctx.fill(); ctx.restore();
+    ctx.lineJoin = 'round'; ctx.strokeStyle = col.ink;
+    for (const L of P.layers) {
+      trace(L.paths, L.z); ctx.fillStyle = col.paper; ctx.fill('evenodd'); ctx.lineWidth = col.line; ctx.stroke();
+    }
+    return { S };
+  }
   // Web Mercator pixel position (256 px tiles) of a latitude/longitude at zoom z
   function merc(lat, lon, z) {
     const n = 256 * 2 ** z, f = lat * Math.PI / 180;
@@ -1225,5 +1322,5 @@
     return out;
   }
 
-  root.TPCore = { despike, makeStore, buildModel, spreadPieces, stl, model3mf, zip, weld, shapeOutline };
+  root.TPCore = { posterLayers, drawPoster, contourRings, despike, makeStore, buildModel, spreadPieces, stl, model3mf, zip, weld, shapeOutline };
 })(typeof self !== 'undefined' ? self : globalThis);

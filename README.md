@@ -23,6 +23,7 @@ There are services that charge per download for exactly this kind of file. The e
   - Each piece can have its number engraved underneath, and the tray floor can get a knurled texture so pieces lift out easily.
 - **A knurled outer edge** for frames and trays, a criss-cross grip texture.
 - **A print guide (PDF) with every download**: settings, filament estimates and a page per print plate.
+- **An A4 poster (PDF) with every download**, light and dark: the place drawn as stacked contour layers, with its name and coordinates.
 - **Settings**: relief exaggeration, rim height, base thickness, clearances, three lettering styles and mesh detail.
 
 Landmarks are built in: 41 places on Earth from the Matterhorn to the Challenger Deep, every Apollo landing site, Mars landers and rovers from Viking to Perseverance, the Soviet Venus landers, Rheasilvia on Vesta, Sputnik Planitia on Pluto and more. Or click anywhere on the globe.

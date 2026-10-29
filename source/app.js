@@ -9,47 +9,47 @@ const WORLDS = {
     datum: 'above mean sea level, sea floor included',
     credit: 'Global grid: NOAA National Centers for Environmental Information, ETOPO 2022 Global Relief Model (60 arc-second version), public domain. Detail when online: AWS Terrain Tiles (Mapzen / Linux Foundation), combining SRTM (NASA, USGS), GMTED2010, ETOPO1, NED, EU-DEM, ArcticDEM, LINZ and others; see github.com/tilezen/joerd/blob/master/docs/attribution.md.',
     marks: [
-      { id: 'matterhorn', group: 'landing', name: 'Matterhorn', note: '4,478 m pyramid above Zermatt', lat: 45.9763, lon: 7.6586, size: 8, ex: 1 },
-      { id: 'everest', group: 'landing', name: 'Mount Everest', note: '8,849 m, the highest peak above sea level', lat: 27.9881, lon: 86.925, size: 30, ex: 1 },
-      { id: 'k2', group: 'landing', name: 'K2', note: '8,611 m in the Karakoram', lat: 35.8808, lon: 76.5155, size: 25, ex: 1 },
-      { id: 'montblanc', group: 'landing', name: 'Mont Blanc', note: '4,806 m, highest in the Alps', lat: 45.8326, lon: 6.8652, size: 20, ex: 1 },
-      { id: 'jungfrau', group: 'landing', name: 'Eiger, Mönch and Jungfrau', note: 'The Bernese Oberland trio', lat: 46.56, lon: 7.98, size: 14, ex: 1 },
-      { id: 'trecime', group: 'landing', name: 'Tre Cime di Lavaredo', note: 'Three towers in the Dolomites', lat: 46.6186, lon: 12.3047, size: 8, ex: 1 },
-      { id: 'fuji', group: 'landing', name: 'Mount Fuji', note: '3,776 m stratovolcano', lat: 35.3606, lon: 138.7274, size: 40, ex: 1.5 },
-      { id: 'kilimanjaro', group: 'landing', name: 'Kilimanjaro', note: '5,895 m, the roof of Africa', lat: -3.0674, lon: 37.3556, size: 50, ex: 1.2 },
-      { id: 'denali', group: 'landing', name: 'Denali', note: '6,190 m, highest in North America', lat: 63.0692, lon: -151.007, size: 40, ex: 1 },
-      { id: 'aconcagua', group: 'landing', name: 'Aconcagua', note: '6,961 m, highest in the Americas', lat: -32.6532, lon: -70.0109, size: 40, ex: 1 },
-      { id: 'cook', group: 'landing', name: 'Aoraki / Mount Cook', note: '3,724 m in the Southern Alps', lat: -43.595, lon: 170.1418, size: 30, ex: 1 },
-      { id: 'kailash', group: 'landing', name: 'Mount Kailash', note: 'Sacred 6,638 m peak in Tibet', lat: 31.0675, lon: 81.3119, size: 25, ex: 1 },
-      { id: 'ararat', group: 'landing', name: 'Mount Ararat', note: '5,137 m volcano', lat: 39.7019, lon: 44.2983, size: 40, ex: 1 },
-      { id: 'rainier', group: 'landing', name: 'Mount Rainier', note: '4,392 m glaciated volcano', lat: 46.8523, lon: -121.7603, size: 30, ex: 1.2 },
-      { id: 'sthelens', group: 'landing', name: 'Mount St. Helens', note: 'Crater left by the 1980 eruption', lat: 46.1912, lon: -122.1944, size: 15, ex: 1.2 },
-      { id: 'etna', group: 'landing', name: 'Etna', note: 'Europe\'s most active volcano', lat: 37.751, lon: 14.9934, size: 40, ex: 1.5 },
-      { id: 'vesuvius', group: 'landing', name: 'Vesuvius', note: 'The volcano above Pompeii', lat: 40.8214, lon: 14.4264, size: 15, ex: 1.5 },
-      { id: 'stromboli', group: 'landing', name: 'Stromboli', note: 'Island volcano rising from the sea floor', lat: 38.789, lon: 15.213, size: 8, ex: 1.5 },
-      { id: 'teide', group: 'landing', name: 'Teide', note: '3,715 m volcano on Tenerife', lat: 28.2724, lon: -16.6425, size: 50, ex: 1.3 },
-      { id: 'krakatoa', group: 'landing', name: 'Krakatoa', note: 'Anak Krakatau in the 1883 caldera', lat: -6.102, lon: 105.423, size: 15, ex: 2 },
-      { id: 'hawaii', group: 'landing', name: 'Mauna Kea and Mauna Loa', note: 'Hawaii\'s Big Island, from the sea floor up', lat: 19.6, lon: -155.5, size: 160, ex: 1.5 },
-      { id: 'grandcanyon', name: 'Grand Canyon', note: 'Carved by the Colorado River, 1.8 km deep', lat: 36.1, lon: -112.1, size: 40, ex: 1.5 },
-      { id: 'monumentvalley', name: 'Monument Valley', note: 'Sandstone buttes on the Colorado Plateau', lat: 36.998, lon: -110.0985, size: 20, ex: 1.5 },
-      { id: 'yosemite', name: 'Yosemite Valley', note: 'Half Dome and El Capitan', lat: 37.7459, lon: -119.5332, size: 15, ex: 1 },
-      { id: 'craterlake', name: 'Crater Lake', note: 'Caldera of Mount Mazama', lat: 42.9446, lon: -122.109, size: 15, ex: 1.5 },
-      { id: 'meteorcrater', name: 'Meteor Crater', note: '1.2 km impact crater in Arizona', lat: 35.0275, lon: -111.0225, size: 3, ex: 2 },
-      { id: 'richat', name: 'Richat Structure', note: 'The Eye of the Sahara, 40 km of rings', lat: 21.124, lon: -11.4017, size: 50, ex: 4 },
-      { id: 'uluru', name: 'Uluru', note: 'Sandstone monolith in central Australia', lat: -25.3444, lon: 131.0369, size: 8, ex: 2 },
-      { id: 'ngorongoro', name: 'Ngorongoro Crater', note: 'Collapsed volcano, 19 km across', lat: -3.17, lon: 35.58, size: 30, ex: 1.5 },
-      { id: 'tablemountain', name: 'Table Mountain', note: 'Flat-topped above Cape Town', lat: -33.9628, lon: 18.4098, size: 15, ex: 1.5 },
-      { id: 'sugarloaf', name: 'Sugarloaf Mountain', note: 'Granite dome over Rio de Janeiro', lat: -22.9488, lon: -43.1566, size: 10, ex: 1.5 },
-      { id: 'torres', name: 'Torres del Paine', note: 'Granite towers in Patagonia', lat: -50.9423, lon: -72.9701, size: 20, ex: 1 },
-      { id: 'zhangjiajie', name: 'Zhangjiajie', note: 'Sandstone pillar forest', lat: 29.32, lon: 110.43, size: 15, ex: 1 },
-      { id: 'chasteuil', name: 'Chasteuil', note: 'Hamlet above the Gorges du Verdon', lat: 43.8369, lon: 6.4227, size: 8, ex: 1 },
-      { id: 'geiranger', name: 'Geirangerfjord', note: 'Steep fjord in western Norway', lat: 62.1, lon: 7.1, size: 20, ex: 1 },
-      { id: 'gibraltar', name: 'Rock of Gibraltar', note: 'Limestone ridge at the strait', lat: 36.144, lon: -5.353, size: 8, ex: 1.5 },
-      { id: 'santorini', name: 'Santorini', note: 'Flooded caldera in the Aegean', lat: 36.404, lon: 25.396, size: 25, ex: 2 },
-      { id: 'borabora', name: 'Bora Bora', note: 'Volcanic island in its lagoon', lat: -16.5004, lon: -151.7415, size: 16, ex: 2 },
-      { id: 'iceland', name: 'Iceland', note: 'The whole island, on the Mid-Atlantic Ridge', lat: 64.96, lon: -19.02, size: 550, ex: 6 },
-      { id: 'alps', name: 'The Alps', note: 'The whole mountain arc', lat: 46.3, lon: 10.0, size: 800, ex: 5 },
-      { id: 'challenger', name: 'Challenger Deep', note: 'Mariana Trench, about 10.9 km deep', lat: 11.3733, lon: 142.5917, size: 200, ex: 3 },
+      { id: 'matterhorn', where: 'SWITZERLAND • CH', group: 'landing', name: 'Matterhorn', note: '4,478 m pyramid above Zermatt', lat: 45.9763, lon: 7.6586, size: 8, ex: 1 },
+      { id: 'everest', where: 'NEPAL • NP', group: 'landing', name: 'Mount Everest', note: '8,849 m, the highest peak above sea level', lat: 27.9881, lon: 86.925, size: 30, ex: 1 },
+      { id: 'k2', where: 'PAKISTAN • PK', group: 'landing', name: 'K2', note: '8,611 m in the Karakoram', lat: 35.8808, lon: 76.5155, size: 25, ex: 1 },
+      { id: 'montblanc', where: 'FRANCE • FR', group: 'landing', name: 'Mont Blanc', note: '4,806 m, highest in the Alps', lat: 45.8326, lon: 6.8652, size: 20, ex: 1 },
+      { id: 'jungfrau', where: 'SWITZERLAND • CH', group: 'landing', name: 'Eiger, Mönch and Jungfrau', note: 'The Bernese Oberland trio', lat: 46.56, lon: 7.98, size: 14, ex: 1 },
+      { id: 'trecime', where: 'DOLOMITES • IT', group: 'landing', name: 'Tre Cime di Lavaredo', note: 'Three towers in the Dolomites', lat: 46.6186, lon: 12.3047, size: 8, ex: 1 },
+      { id: 'fuji', where: 'JAPAN • JP', group: 'landing', name: 'Mount Fuji', note: '3,776 m stratovolcano', lat: 35.3606, lon: 138.7274, size: 40, ex: 1.5 },
+      { id: 'kilimanjaro', where: 'TANZANIA • TZ', group: 'landing', name: 'Kilimanjaro', note: '5,895 m, the roof of Africa', lat: -3.0674, lon: 37.3556, size: 50, ex: 1.2 },
+      { id: 'denali', where: 'ALASKA • US', group: 'landing', name: 'Denali', note: '6,190 m, highest in North America', lat: 63.0692, lon: -151.007, size: 40, ex: 1 },
+      { id: 'aconcagua', where: 'ARGENTINA • AR', group: 'landing', name: 'Aconcagua', note: '6,961 m, highest in the Americas', lat: -32.6532, lon: -70.0109, size: 40, ex: 1 },
+      { id: 'cook', where: 'NEW ZEALAND • NZ', group: 'landing', name: 'Aoraki / Mount Cook', note: '3,724 m in the Southern Alps', lat: -43.595, lon: 170.1418, size: 30, ex: 1 },
+      { id: 'kailash', where: 'TIBET • CN', group: 'landing', name: 'Mount Kailash', note: 'Sacred 6,638 m peak in Tibet', lat: 31.0675, lon: 81.3119, size: 25, ex: 1 },
+      { id: 'ararat', where: 'TÜRKIYE • TR', group: 'landing', name: 'Mount Ararat', note: '5,137 m volcano', lat: 39.7019, lon: 44.2983, size: 40, ex: 1 },
+      { id: 'rainier', where: 'WASHINGTON • US', group: 'landing', name: 'Mount Rainier', note: '4,392 m glaciated volcano', lat: 46.8523, lon: -121.7603, size: 30, ex: 1.2 },
+      { id: 'sthelens', where: 'WASHINGTON • US', group: 'landing', name: 'Mount St. Helens', note: 'Crater left by the 1980 eruption', lat: 46.1912, lon: -122.1944, size: 15, ex: 1.2 },
+      { id: 'etna', where: 'SICILY • IT', group: 'landing', name: 'Etna', note: 'Europe\'s most active volcano', lat: 37.751, lon: 14.9934, size: 40, ex: 1.5 },
+      { id: 'vesuvius', where: 'ITALY • IT', group: 'landing', name: 'Vesuvius', note: 'The volcano above Pompeii', lat: 40.8214, lon: 14.4264, size: 15, ex: 1.5 },
+      { id: 'stromboli', where: 'ITALY • IT', group: 'landing', name: 'Stromboli', note: 'Island volcano rising from the sea floor', lat: 38.789, lon: 15.213, size: 8, ex: 1.5 },
+      { id: 'teide', where: 'CANARY ISLANDS • ES', group: 'landing', name: 'Teide', note: '3,715 m volcano on Tenerife', lat: 28.2724, lon: -16.6425, size: 50, ex: 1.3 },
+      { id: 'krakatoa', where: 'INDONESIA • ID', group: 'landing', name: 'Krakatoa', note: 'Anak Krakatau in the 1883 caldera', lat: -6.102, lon: 105.423, size: 15, ex: 2 },
+      { id: 'hawaii', where: 'HAWAII • US', group: 'landing', name: 'Mauna Kea and Mauna Loa', note: 'Hawaii\'s Big Island, from the sea floor up', lat: 19.6, lon: -155.5, size: 160, ex: 1.5 },
+      { id: 'grandcanyon', where: 'ARIZONA • US', name: 'Grand Canyon', note: 'Carved by the Colorado River, 1.8 km deep', lat: 36.1, lon: -112.1, size: 40, ex: 1.5 },
+      { id: 'monumentvalley', where: 'UTAH • US', name: 'Monument Valley', note: 'Sandstone buttes on the Colorado Plateau', lat: 36.998, lon: -110.0985, size: 20, ex: 1.5 },
+      { id: 'yosemite', where: 'CALIFORNIA • US', name: 'Yosemite Valley', note: 'Half Dome and El Capitan', lat: 37.7459, lon: -119.5332, size: 15, ex: 1 },
+      { id: 'craterlake', where: 'OREGON • US', name: 'Crater Lake', note: 'Caldera of Mount Mazama', lat: 42.9446, lon: -122.109, size: 15, ex: 1.5 },
+      { id: 'meteorcrater', where: 'ARIZONA • US', name: 'Meteor Crater', note: '1.2 km impact crater in Arizona', lat: 35.0275, lon: -111.0225, size: 3, ex: 2 },
+      { id: 'richat', where: 'MAURITANIA • MR', name: 'Richat Structure', note: 'The Eye of the Sahara, 40 km of rings', lat: 21.124, lon: -11.4017, size: 50, ex: 4 },
+      { id: 'uluru', where: 'AUSTRALIA • AU', name: 'Uluru', note: 'Sandstone monolith in central Australia', lat: -25.3444, lon: 131.0369, size: 8, ex: 2 },
+      { id: 'ngorongoro', where: 'TANZANIA • TZ', name: 'Ngorongoro Crater', note: 'Collapsed volcano, 19 km across', lat: -3.17, lon: 35.58, size: 30, ex: 1.5 },
+      { id: 'tablemountain', where: 'SOUTH AFRICA • ZA', name: 'Table Mountain', note: 'Flat-topped above Cape Town', lat: -33.9628, lon: 18.4098, size: 15, ex: 1.5 },
+      { id: 'sugarloaf', where: 'BRAZIL • BR', name: 'Sugarloaf Mountain', note: 'Granite dome over Rio de Janeiro', lat: -22.9488, lon: -43.1566, size: 10, ex: 1.5 },
+      { id: 'torres', where: 'CHILE • CL', name: 'Torres del Paine', note: 'Granite towers in Patagonia', lat: -50.9423, lon: -72.9701, size: 20, ex: 1 },
+      { id: 'zhangjiajie', where: 'CHINA • CN', name: 'Zhangjiajie', note: 'Sandstone pillar forest', lat: 29.32, lon: 110.43, size: 15, ex: 1 },
+      { id: 'chasteuil', where: 'FRANCE • FR', name: 'Chasteuil', note: 'Hamlet above the Gorges du Verdon', lat: 43.8369, lon: 6.4227, size: 8, ex: 1 },
+      { id: 'geiranger', where: 'NORWAY • NO', name: 'Geirangerfjord', note: 'Steep fjord in western Norway', lat: 62.1, lon: 7.1, size: 20, ex: 1 },
+      { id: 'gibraltar', where: 'GIBRALTAR • GI', name: 'Rock of Gibraltar', note: 'Limestone ridge at the strait', lat: 36.144, lon: -5.353, size: 8, ex: 1.5 },
+      { id: 'santorini', where: 'GREECE • GR', name: 'Santorini', note: 'Flooded caldera in the Aegean', lat: 36.404, lon: 25.396, size: 25, ex: 2 },
+      { id: 'borabora', where: 'FRENCH POLYNESIA • PF', name: 'Bora Bora', note: 'Volcanic island in its lagoon', lat: -16.5004, lon: -151.7415, size: 16, ex: 2 },
+      { id: 'iceland', where: 'ICELAND • IS', name: 'Iceland', note: 'The whole island, on the Mid-Atlantic Ridge', lat: 64.96, lon: -19.02, size: 550, ex: 6 },
+      { id: 'alps', where: 'EUROPE', name: 'The Alps', note: 'The whole mountain arc', lat: 46.3, lon: 10.0, size: 800, ex: 5 },
+      { id: 'challenger', where: 'PACIFIC OCEAN', name: 'Challenger Deep', note: 'Mariana Trench, about 10.9 km deep', lat: 11.3733, lon: 142.5917, size: 200, ex: 3 },
     ] },
   moon: { name: 'Moon', dot: '#bdb7a6', terrain: '#8e8d87', grid: 'LOLA LDEM_64', patchName: 'LOLA LDEM_1024', patchBadge: '83 m', landingTitle: 'Apollo landing sites', def: 'tycho',
     datum: 'above the 1737.4 km sphere',
@@ -548,6 +548,17 @@ async function printGuide(r, p, slug) {
     footprint: `${Math.round(p.widthMm + 2 * fr)} × ${Math.round(H + 2 * fr + (p.loop ? 11 : 0))} mm`,
     hasAssembled: r.files.some(f => f[0].endsWith('-assembled.3mf')), font });
 }
+// the A4 poster: where the place is, its name and its coordinates
+async function poster(png, dark, p) {
+  await Promise.all([loadScript(JSPDF_URL), loadScript('poster.js?v=' + BUILD)]);
+  const W = WORLDS[state.world];
+  const L = W.marks.find(x => x.id === state.mark) || W.marks.find(x => Math.abs(x.lat - state.lat) < 0.01 && Math.abs(x.lon - state.lon) < 0.01);
+  const title = t => t.toLowerCase().replace(/(^|[\s\-\/(])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  const typed = $('t-top').value.trim();
+  const name = L ? L.name : typed ? title(typed) : W.name;
+  const f = (v, pos, neg) => `${Math.abs(v).toFixed(2)}°${v >= 0 ? pos : neg}`;
+  return TPPoster.make({ png, dark, where: (L && L.where) || W.name.toUpperCase(), name, coords: `${f(state.lat, 'N', 'S')} ${f(state.lon, 'E', 'W')}` });
+}
 $('export').onclick = async () => {
   const btn = $('export'); if (btn.disabled || !ready) return; btn.disabled = true; const old = 'Download print files';
   try {
@@ -566,6 +577,11 @@ $('export').onclick = async () => {
       console.warn('Print guide failed', e);
       const s = r.stats, readme = readmeTemplate(p, slug).replace('{{RELIEF}}', s.reliefMm.toFixed(1)).replace('{{LOW}}', Math.round(s.hMin)).replace('{{HIGH}}', Math.round(s.hMax)).replace('{{FRAMETOP}}', s.frameTop.toFixed(2)).replace('{{PX}}', s.pxM.toFixed(0));
       files.push(['README.txt', readme]);
+    }
+    if (r.posters) {
+      btn.textContent = 'Laying out the posters…';
+      try { for (const [k, png] of Object.entries(r.posters)) files.push([`${slug}-poster-${k}.pdf`, await poster(png, k === 'dark', p)]); }
+      catch (e) { console.warn('Poster failed', e); }
     }
     btn.textContent = 'Packing files…';
     const transfer = files.map(f => f[1]).filter(d => d instanceof Uint8Array).map(d => d.buffer);

@@ -3,6 +3,10 @@ importScripts('lib/poly2tri.min.js', 'lib/clipper.js', 'core.js' + self.location
 const C = self.TPCore;
 let meta = null, store = null;
 const fonts = {};
+const POSTER_COLOURS = {
+  light: { paper: '#ffffff', ink: '#111111', shadow: 'rgba(0, 0, 0, 0.22)', line: 1.6 },
+  dark: { paper: '#0b0b0b', ink: '#f2f2f2', shadow: 'rgba(255, 255, 255, 0.10)', line: 1.6 },
+};
 
 async function decode(path) {
   const r = await fetch(path);
@@ -207,8 +211,21 @@ self.onmessage = async e => {
       const out = await exportFiles(model, m.p, m.x), transfer = [];
       const plates = out.plates.map(pl => plateForGuide(pl, transfer));
       for (const f of out.files) if (f[1] instanceof Uint8Array) transfer.push(f[1].buffer);
+      // the poster drawings (light and dark), 300 dpi for the A4 page's drawing area; the page adds the text
+      let posters = null;
+      if (typeof OffscreenCanvas !== 'undefined') {
+        try {
+          self.postMessage({ type: 'progress', id: m.id, text: 'Drawing the poster…' });
+          const P = C.posterLayers(hf, m.p), w = 3130, h = 1724, cv = new OffscreenCanvas(w, h), ctx = cv.getContext('2d');
+          posters = {};
+          for (const [k, col] of Object.entries(POSTER_COLOURS)) {
+            C.drawPoster(ctx, P, w, h, col);
+            posters[k] = new Uint8Array(await (await cv.convertToBlob({ type: 'image/png' })).arrayBuffer()); transfer.push(posters[k].buffer);
+          }
+        } catch (e) { posters = null; }
+      }
       const stats = { reliefMm: model.reliefMm, hMin: model.hMin, hMax: model.hMax, frameTop: model.frameTop || 0, floorZ: model.floorZ || 0, pxM: hf.source.pxKm * 1000, sourceKind: hf.source.kind };
-      self.postMessage({ type: 'exported', id: m.id, files: out.files, plates, pieces: out.pieces, stats }, transfer);
+      self.postMessage({ type: 'exported', id: m.id, files: out.files, plates, pieces: out.pieces, stats, posters }, transfer);
       return;
     }
     if (m.type === 'zip') { // the page adds the print guide (or a plain README) and has the files zipped

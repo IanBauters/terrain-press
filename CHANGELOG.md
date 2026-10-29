@@ -2,6 +2,14 @@
 
 What changed in each update, in plain words. The newest is at the top.
 
+## 1.4.0 · 29 October 2026
+
+### Added
+- **Every download now includes an A4 poster of the place, in a light and a dark version.** The landscape is drawn as stacked layers, with contour lines across the top and the cut sides hatched.
+  - It shows where the place is, its name and its coordinates, for example "NEPAL • NP", "Mount Everest" and "27.99°N 86.92°E".
+  - The drawing follows your model: the same shape, area and relief exaggeration.
+  - Earth's landmarks show their country. For a spot you pick yourself, and on the other worlds, the poster shows the world's name.
+
 ## 1.3.2 · 29 October 2026
 
 ### Fixed
