@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+x-amz-id-2: J9hND1zuvfNKHW8wlS44/feyjcVnT+C3P1qa/Zi81dZW6htJcdNgK0DyjhgfUe8aWx+BO02AeU12lyt4wBSdVnlLPMOqdWRr
+x-amz-request-id: 812QAYYDFC9M11JY
+Server: AmazonS3
+Date: Thu, 29 Oct 2026 15:49:29 GMT
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET
+Access-Control-Expose-Headers: x-amz-meta-x-imagery-sources
+Access-Control-Max-Age: 3000
+Vary: Origin, Access-Control-Request-Headers, Access-Control-Request-Method
+Last-Modified: Wed, 15 Nov 2017 21:11:33 GMT
+ETag: "901d9818ecf722838a7893567e38deaf"
+x-amz-meta-x-imagery-sources: eudem/eudem_dem_5deg_n45e005.tif
+x-amz-version-id: B_GkcqPuiUCobJcyVlujv7H.UJbLg1c1
+Accept-Ranges: bytes
+Content-Type: image/png
+Content-Length: 113757
+
