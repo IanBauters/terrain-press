@@ -2,10 +2,11 @@
 
 ## Elevation data
 
-All datasets are public domain or distributed without restriction. Please keep crediting the teams who made them.
+The global grids are public domain. The live Earth tiles combine sources that ask for attribution, listed below. Please keep crediting the teams who made them.
 
 | World | Dataset | Credit |
 |---|---|---|
+| Earth (offline grid) | ETOPO 2022 Global Relief Model, 60 arc-second surface elevation | NOAA National Centers for Environmental Information (NCEI) |
 | Moon | LOLA Gridded Data Records LDEM_64 and LDEM_1024 | NASA Lunar Reconnaissance Orbiter, LOLA Science Team (NASA GSFC); PDS Geosciences Node |
 | Mars | MOLA Mission Experiment Gridded Data Record (MEGDR) | NASA Mars Global Surveyor, MOLA Science Team (NASA GSFC); PDS Geosciences Node |
 | Mercury | Mercury MESSENGER Global DEM v2, 665 m (Becker et al. 2016) | USGS Astrogeology Science Center; NASA / JHUAPL / Carnegie Institution of Washington, MESSENGER MDIS |
@@ -17,6 +18,17 @@ All datasets are public domain or distributed without restriction. Please keep c
 The Moon, Mars and Ceres data was obtained through the elevation tiles mirrored by the [galaxy-3d](https://github.com/Addey34/galaxy-3d) project, whose records list these datasets as public domain. The data was re-encoded into Terrain Press's own tile format; no galaxy-3d code is used.
 
 Globe images are shaded relief rendered from the same elevation data.
+
+### Earth detail when online
+
+For small places on Earth, the browser loads [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Mapzen, now hosted by the Linux Foundation and Amazon's Registry of Open Data) directly from Amazon. Unlike the other datasets, some of their sources ask for attribution:
+
+- SRTM (NASA, USGS), GMTED2010 (USGS), ETOPO1 (NOAA), NED / 3DEP (USGS)
+- EU-DEM (produced using Copernicus data and information funded by the European Union)
+- ArcticDEM (Polar Geospatial Center, NSF), Canadian Digital Elevation Model (Natural Resources Canada, Open Government Licence – Canada)
+- LINZ (Land Information New Zealand, CC BY 4.0), Geoscience Australia (CC BY 4.0), Mexico INEGI, Norway Kartverket (CC BY 4.0), UK Environment Agency (Open Government Licence)
+
+The full list is in [tilezen/joerd's attribution notes](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). Terrain Press smooths away the odd false spike these tiles have where gaps in the radar data were filled.
 
 ## Software bundled in `site/`
 

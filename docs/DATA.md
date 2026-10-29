@@ -19,6 +19,7 @@ Notes on the format:
 - **Encoding:** heights are lossless WebP, RGB, in whole metres: `height = R × 256 + G − 32768`. The B channel is unused. Lossless WebP keeps every value exact.
 - **Check value:** browsers must not colour-manage these images. The app checks that by comparing the sum of row 512 of `overview.webp` with `check` in `meta.json`.
 - **Global grids** are 8192 × 4096 (Mercury 10240 × 5120).
+- **Live tiles (Earth only):** see Earth below.
 
 `meta.json` lists, per world:
 
@@ -28,6 +29,11 @@ Notes on the format:
 - `patches`, with their bounds.
 
 ## Worlds
+
+**Earth:** NOAA ETOPO 2022, 60 arc-second surface elevation (land, sea floor and the top of the ice sheets), public domain.
+- Heights are metres above mean sea level, ocean depths included, on a 6371 km sphere.
+- Resampled to 8192 × 4096 (about 4.9 km per pixel) by [`tools/earth_data.py`](../tools/earth_data.py), which also draws the globe image with ocean and land colours.
+- That grid is far too coarse for a mountain, so when a region needs finer samples the app loads **AWS Terrain Tiles** live (`meta.json` → `earth.live`): 256 px Web Mercator PNGs in the terrarium encoding, `height = R × 256 + G + B / 256 − 32768`, up to zoom 15. It picks the zoom whose pixels match the sample spacing, at most 48 tiles per region, and removes lone spikes (a pixel far from the median of its 5 × 5 neighbours). Offline, it falls back to the global grid and shows a note.
 
 **Moon:** LOLA gridded data records. Heights are above the 1737.4 km sphere. The sharper patches around the Apollo sites and Tycho are resampled from LDEM_1024.
 

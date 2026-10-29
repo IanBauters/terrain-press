@@ -45,12 +45,14 @@
   --tp-accent: #d6ccb2; --tp-accent-ink: #15130e; --tp-accent-soft: rgba(214, 204, 178, .14); color-scheme: dark }
 :root[data-bs-theme="light"] { color-scheme: light }
 /* world accents, light then dark */
+body[data-world="earth"] { --tp-accent: #2f6d9e; --tp-accent-soft: rgba(47, 109, 158, .13) }
 body[data-world="mars"] { --tp-accent: #b4522a; --tp-accent-soft: rgba(180, 82, 42, .13) }
 body[data-world="mercury"] { --tp-accent: #7a6a52; --tp-accent-soft: rgba(122, 106, 82, .14) }
 body[data-world="ceres"] { --tp-accent: #56657a; --tp-accent-soft: rgba(86, 101, 122, .14) }
 body[data-world="vesta"] { --tp-accent: #6e675b; --tp-accent-soft: rgba(110, 103, 91, .14) }
 body[data-world="venus"] { --tp-accent: #a3621f; --tp-accent-soft: rgba(163, 98, 31, .13) }
 body[data-world="pluto"] { --tp-accent: #94604a; --tp-accent-soft: rgba(148, 96, 74, .13) }
+[data-bs-theme="dark"] body[data-world="earth"] { --tp-accent: #7fb3dc; --tp-accent-ink: #0a131b; --tp-accent-soft: rgba(127, 179, 220, .15) }
 [data-bs-theme="dark"] body[data-world="mars"] { --tp-accent: #e0834f; --tp-accent-ink: #1a0d07; --tp-accent-soft: rgba(224, 131, 79, .15) }
 [data-bs-theme="dark"] body[data-world="mercury"] { --tp-accent: #c4b394; --tp-accent-ink: #17140f; --tp-accent-soft: rgba(196, 179, 148, .15) }
 [data-bs-theme="dark"] body[data-world="ceres"] { --tp-accent: #a9b7c9; --tp-accent-ink: #0f1318; --tp-accent-soft: rgba(169, 183, 201, .15) }
@@ -173,7 +175,7 @@ body { background: var(--tp-bg); color: var(--tp-ink); --bs-body-bg: var(--tp-bg
       <div class="row g-2">
         <div class="col-4"><label class="tp-label" for="lat">Latitude °</label><input class="form-control form-control-sm tp-num" id="lat" type="number" step="0.01" min="-90" max="90"></div>
         <div class="col-4"><label class="tp-label" for="lon">Longitude °E</label><input class="form-control form-control-sm tp-num" id="lon" type="number" step="0.01" min="-180" max="180"></div>
-        <div class="col-4"><label class="tp-label" for="size">Width km</label><input class="form-control form-control-sm tp-num" id="size" type="number" step="1" min="10" max="9000"></div>
+        <div class="col-4"><label class="tp-label" for="size">Width km</label><input class="form-control form-control-sm tp-num" id="size" type="number" step="1" min="2" max="9000"></div>
       </div>
       <p class="tp-hint" id="where-hint">Open the <b>Globe</b> tab to pick any spot; the dots are landing sites.</p>
     </section>
@@ -293,13 +295,59 @@ body { background: var(--tp-bg); color: var(--tp-ink); --bs-body-bg: var(--tp-bg
 
 <script src="lib/three.min.js"></script>
 <script src="lib/OrbitControls.js"></script>
-<script>const BUILD = '19c93406c8'; // changes whenever worker.js or core.js change, so browsers never run stale code
+<script>const BUILD = 'cb634472b1'; // changes whenever worker.js or core.js change, so browsers never run stale code
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
 
 // ---------------- catalogue ----------------
 const WORLDS = {
+  earth: { name: 'Earth', dot: '#4f86b8', terrain: '#8f9a86', grid: 'ETOPO 2022', liveName: 'AWS Terrain Tiles', landingTitle: 'Mountains and volcanoes', def: 'matterhorn',
+    datum: 'above mean sea level, sea floor included',
+    credit: 'Global grid: NOAA National Centers for Environmental Information, ETOPO 2022 Global Relief Model (60 arc-second version), public domain. Detail when online: AWS Terrain Tiles (Mapzen / Linux Foundation), combining SRTM (NASA, USGS), GMTED2010, ETOPO1, NED, EU-DEM, ArcticDEM, LINZ and others; see github.com/tilezen/joerd/blob/master/docs/attribution.md.',
+    marks: [
+      { id: 'matterhorn', group: 'landing', name: 'Matterhorn', note: '4,478 m pyramid above Zermatt', lat: 45.9763, lon: 7.6586, size: 8, ex: 1 },
+      { id: 'everest', group: 'landing', name: 'Mount Everest', note: '8,849 m, the highest peak above sea level', lat: 27.9881, lon: 86.925, size: 30, ex: 1 },
+      { id: 'k2', group: 'landing', name: 'K2', note: '8,611 m in the Karakoram', lat: 35.8808, lon: 76.5155, size: 25, ex: 1 },
+      { id: 'montblanc', group: 'landing', name: 'Mont Blanc', note: '4,806 m, highest in the Alps', lat: 45.8326, lon: 6.8652, size: 20, ex: 1 },
+      { id: 'jungfrau', group: 'landing', name: 'Eiger, Mönch and Jungfrau', note: 'The Bernese Oberland trio', lat: 46.56, lon: 7.98, size: 14, ex: 1 },
+      { id: 'trecime', group: 'landing', name: 'Tre Cime di Lavaredo', note: 'Three towers in the Dolomites', lat: 46.6186, lon: 12.3047, size: 8, ex: 1 },
+      { id: 'fuji', group: 'landing', name: 'Mount Fuji', note: '3,776 m stratovolcano', lat: 35.3606, lon: 138.7274, size: 40, ex: 1.5 },
+      { id: 'kilimanjaro', group: 'landing', name: 'Kilimanjaro', note: '5,895 m, the roof of Africa', lat: -3.0674, lon: 37.3556, size: 50, ex: 1.2 },
+      { id: 'denali', group: 'landing', name: 'Denali', note: '6,190 m, highest in North America', lat: 63.0692, lon: -151.007, size: 40, ex: 1 },
+      { id: 'aconcagua', group: 'landing', name: 'Aconcagua', note: '6,961 m, highest in the Americas', lat: -32.6532, lon: -70.0109, size: 40, ex: 1 },
+      { id: 'cook', group: 'landing', name: 'Aoraki / Mount Cook', note: '3,724 m in the Southern Alps', lat: -43.595, lon: 170.1418, size: 30, ex: 1 },
+      { id: 'kailash', group: 'landing', name: 'Mount Kailash', note: 'Sacred 6,638 m peak in Tibet', lat: 31.0675, lon: 81.3119, size: 25, ex: 1 },
+      { id: 'ararat', group: 'landing', name: 'Mount Ararat', note: '5,137 m volcano', lat: 39.7019, lon: 44.2983, size: 40, ex: 1 },
+      { id: 'rainier', group: 'landing', name: 'Mount Rainier', note: '4,392 m glaciated volcano', lat: 46.8523, lon: -121.7603, size: 30, ex: 1.2 },
+      { id: 'sthelens', group: 'landing', name: 'Mount St. Helens', note: 'Crater left by the 1980 eruption', lat: 46.1912, lon: -122.1944, size: 15, ex: 1.2 },
+      { id: 'etna', group: 'landing', name: 'Etna', note: 'Europe\'s most active volcano', lat: 37.751, lon: 14.9934, size: 40, ex: 1.5 },
+      { id: 'vesuvius', group: 'landing', name: 'Vesuvius', note: 'The volcano above Pompeii', lat: 40.8214, lon: 14.4264, size: 15, ex: 1.5 },
+      { id: 'stromboli', group: 'landing', name: 'Stromboli', note: 'Island volcano rising from the sea floor', lat: 38.789, lon: 15.213, size: 8, ex: 1.5 },
+      { id: 'teide', group: 'landing', name: 'Teide', note: '3,715 m volcano on Tenerife', lat: 28.2724, lon: -16.6425, size: 50, ex: 1.3 },
+      { id: 'krakatoa', group: 'landing', name: 'Krakatoa', note: 'Anak Krakatau in the 1883 caldera', lat: -6.102, lon: 105.423, size: 15, ex: 2 },
+      { id: 'hawaii', group: 'landing', name: 'Mauna Kea and Mauna Loa', note: 'Hawaii\'s Big Island, from the sea floor up', lat: 19.6, lon: -155.5, size: 160, ex: 1.5 },
+      { id: 'grandcanyon', name: 'Grand Canyon', note: 'Carved by the Colorado River, 1.8 km deep', lat: 36.1, lon: -112.1, size: 40, ex: 1.5 },
+      { id: 'monumentvalley', name: 'Monument Valley', note: 'Sandstone buttes on the Colorado Plateau', lat: 36.998, lon: -110.0985, size: 20, ex: 1.5 },
+      { id: 'yosemite', name: 'Yosemite Valley', note: 'Half Dome and El Capitan', lat: 37.7459, lon: -119.5332, size: 15, ex: 1 },
+      { id: 'craterlake', name: 'Crater Lake', note: 'Caldera of Mount Mazama', lat: 42.9446, lon: -122.109, size: 15, ex: 1.5 },
+      { id: 'meteorcrater', name: 'Meteor Crater', note: '1.2 km impact crater in Arizona', lat: 35.0275, lon: -111.0225, size: 3, ex: 2 },
+      { id: 'richat', name: 'Richat Structure', note: 'The Eye of the Sahara, 40 km of rings', lat: 21.124, lon: -11.4017, size: 50, ex: 4 },
+      { id: 'uluru', name: 'Uluru', note: 'Sandstone monolith in central Australia', lat: -25.3444, lon: 131.0369, size: 8, ex: 2 },
+      { id: 'ngorongoro', name: 'Ngorongoro Crater', note: 'Collapsed volcano, 19 km across', lat: -3.17, lon: 35.58, size: 30, ex: 1.5 },
+      { id: 'tablemountain', name: 'Table Mountain', note: 'Flat-topped above Cape Town', lat: -33.9628, lon: 18.4098, size: 15, ex: 1.5 },
+      { id: 'sugarloaf', name: 'Sugarloaf Mountain', note: 'Granite dome over Rio de Janeiro', lat: -22.9488, lon: -43.1566, size: 10, ex: 1.5 },
+      { id: 'torres', name: 'Torres del Paine', note: 'Granite towers in Patagonia', lat: -50.9423, lon: -72.9701, size: 20, ex: 1 },
+      { id: 'zhangjiajie', name: 'Zhangjiajie', note: 'Sandstone pillar forest', lat: 29.32, lon: 110.43, size: 15, ex: 1 },
+      { id: 'chasteuil', name: 'Chasteuil', note: 'Hamlet above the Gorges du Verdon', lat: 43.8369, lon: 6.4227, size: 8, ex: 1 },
+      { id: 'geiranger', name: 'Geirangerfjord', note: 'Steep fjord in western Norway', lat: 62.1, lon: 7.1, size: 20, ex: 1 },
+      { id: 'gibraltar', name: 'Rock of Gibraltar', note: 'Limestone ridge at the strait', lat: 36.144, lon: -5.353, size: 8, ex: 1.5 },
+      { id: 'santorini', name: 'Santorini', note: 'Flooded caldera in the Aegean', lat: 36.404, lon: 25.396, size: 25, ex: 2 },
+      { id: 'borabora', name: 'Bora Bora', note: 'Volcanic island in its lagoon', lat: -16.5004, lon: -151.7415, size: 16, ex: 2 },
+      { id: 'iceland', name: 'Iceland', note: 'The whole island, on the Mid-Atlantic Ridge', lat: 64.96, lon: -19.02, size: 550, ex: 6 },
+      { id: 'alps', name: 'The Alps', note: 'The whole mountain arc', lat: 46.3, lon: 10.0, size: 800, ex: 5 },
+      { id: 'challenger', name: 'Challenger Deep', note: 'Mariana Trench, about 10.9 km deep', lat: 11.3733, lon: 142.5917, size: 200, ex: 3 },
+    ] },
   moon: { name: 'Moon', dot: '#bdb7a6', terrain: '#8e8d87', grid: 'LOLA LDEM_64', patchName: 'LOLA LDEM_1024', patchBadge: '83 m', landingTitle: 'Apollo landing sites', def: 'tycho',
     datum: 'above the 1737.4 km sphere',
     credit: 'NASA Lunar Reconnaissance Orbiter, Lunar Orbiter Laser Altimeter (LOLA) gridded data records LDEM_64 and LDEM_1024. LOLA Science Team, NASA GSFC; PDS Geosciences Node. Public domain. Tiles mirrored by the galaxy-3d project.',
@@ -513,7 +561,7 @@ async function build() {
 }
 function showStats(p, r) {
   const W = WORLDS[state.world], src = r.source, s = r.stats, pxM = src.pxKm * 1000;
-  $('chip-src').innerHTML = `<b>${src.kind === 'patch' ? (W.patchName || W.grid) : W.grid}</b> · ${pxM < 1000 ? Math.round(pxM) + ' m' : (pxM / 1000).toFixed(2) + ' km'} per sample`;
+  $('chip-src').innerHTML = `<b>${src.kind === 'patch' ? (W.patchName || W.grid) : src.kind === 'live' ? (W.liveName || W.grid) : W.grid}</b> · ${pxM < 1000 ? Math.round(pxM) + ' m' : (pxM / 1000).toFixed(2) + ' km'} per sample`;
   $('st-low').textContent = fmtM(s.hMin); $('st-high').textContent = fmtM(s.hMax);
   $('st-relief').innerHTML = `${s.reliefMm.toFixed(1)} mm <small>${((s.hMax - s.hMin) / 1000).toFixed(1)} km real</small>`;
   const H = p.shape === 'hexagon' ? p.widthMm * Math.sqrt(3) / 2 : p.widthMm, fr = p.border === 'none' ? 0 : p.frameMm;
@@ -524,6 +572,7 @@ function showStats(p, r) {
   $('exag-hint').textContent = `${p.exag}× · 1× is true scale. ` + (rel < 2 ? 'Relief is shallow; try more exaggeration.' : rel > 25 ? 'Tall; check the slicer for steep walls.' : 'Reads well at this width.');
   // Pluto: warn when the region strays into the unmapped half
   const warn = $('chip-warn'); warn.hidden = true;
+  if (src.offline) { warn.hidden = false; warn.textContent = 'Offline: using the coarser global grid, so small places look smooth'; }
   if (W.partial && coverage) { const c = coverageAt(state.lat, state.lon); if (c < 0.9) { warn.hidden = false; warn.textContent = c < 0.2 ? 'Not mapped by New Horizons: this is a smooth fill' : 'Partly outside the mapped area'; } }
 }
 
@@ -793,7 +842,7 @@ $('exag').addEventListener('input', () => { $('o-exag').textContent = exFromSlid
 $('sun').addEventListener('input', () => { $('o-sun').textContent = $('sun').value + '°'; bench.setSun(+$('sun').value); });
 $('mark-filter').addEventListener('input', renderMarks);
 for (const id of ['lat', 'lon', 'size']) $(id).addEventListener('change', () => {
-  state.lat = clamp(+$('lat').value, -90, 90, state.lat); state.lon = clamp(+$('lon').value, -180, 180, state.lon); state.size = clamp(+$('size').value, 10, 9000, state.size);
+  state.lat = clamp(+$('lat').value, -90, 90, state.lat); state.lon = clamp(+$('lon').value, -180, 180, state.lon); state.size = clamp(+$('size').value, 2, 9000, state.size);
   state.mark = null; syncInputs(); renderMarks(); updateCoord(); if (globe) globe.refresh(); schedule(true);
 });
 for (const k of ['terrain', 'frame', 'text']) $('c-' + k).addEventListener('input', e => { state.colors[k] = e.target.value; bench.recolor(); });

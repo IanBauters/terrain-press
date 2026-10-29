@@ -11,6 +11,15 @@ async function decode(path) {
   const cv = new OffscreenCanvas(bmp.width, bmp.height), ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(bmp, 0, 0);
   const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data, out = new Float32Array(bmp.width * bmp.height);
+  if (/^https?:/.test(path)) { // live terrarium tiles: the blue channel holds 1/256 m
+    for (let i = 0, k = 0; i < out.length; i++, k += 4) out[i] = px[k] * 256 + px[k + 1] + px[k + 2] / 256 - 32768;
+    const m = path.match(/\/(\d+)\/(\d+)\/(\d+)\.png/);
+    if (m) { // remove the odd false spike these tiles have where radar gaps were filled
+      const z = +m[1], n = 2 ** z, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * (+m[3] + 0.5) / n)));
+      C.despike(out, bmp.width, bmp.height, 500 + 2 * 40075016 * Math.cos(lat) / (256 * n));
+    }
+    return out;
+  }
   for (let i = 0, k = 0; i < out.length; i++, k += 4) out[i] = px[k] * 256 + px[k + 1] - 32768;
   if (path.endsWith('overview.webp')) {
     const body = path.split('/')[1], w = bmp.width; let s = 0;
@@ -187,7 +196,7 @@ self.onmessage = async e => {
         model.parts = [...sp.parts.map(o => mv(o, -cx)), ...rest.map(o => mv(o, shift - cx))];
       }
       const { parts, transfer } = pack(model, true);
-      self.postMessage({ type: 'built', id: m.id, parts, stats: { hMin: model.hMin, hMax: model.hMax, reliefMm: model.reliefMm, frameTop: model.frameTop, floorZ: model.floorZ, grid: model.grid ? { cellW: model.grid.cellW, cellH: model.grid.cellH } : null }, source: { kind: hf.source.kind, pxKm: hf.source.pxKm, label: hf.source.label } }, transfer);
+      self.postMessage({ type: 'built', id: m.id, parts, stats: { hMin: model.hMin, hMax: model.hMax, reliefMm: model.reliefMm, frameTop: model.frameTop, floorZ: model.floorZ, grid: model.grid ? { cellW: model.grid.cellW, cellH: model.grid.cellH } : null }, source: { kind: hf.source.kind, pxKm: hf.source.pxKm, label: hf.source.label, offline: !!hf.source.offline } }, transfer);
       return;
     }
     if (m.type === 'export') {

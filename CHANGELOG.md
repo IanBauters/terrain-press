@@ -2,6 +2,15 @@
 
 What changed in each update, in plain words. The newest is at the top.
 
+## 1.3.0 · 29 October 2026
+
+### Added
+- **Earth is here.** Pick any place on Earth, from a single mountain to a whole ocean basin, and print it as an ornament or a puzzle.
+  - 41 landmarks to start from, such as the Matterhorn, Mount Fuji, the Grand Canyon, the Richat Structure, Bora Bora and the Challenger Deep.
+  - The sea floor is included, so islands rise from the ocean bed and trenches show up.
+  - Small places are sharp: when you're online, Earth loads detailed elevation (down to a few metres per sample) for the spot you pick. Without internet it uses its built-in world map, which is about 5 km per sample, and the app tells you so.
+- **Regions can now be as small as 2 km across**, for small peaks and craters. This works on every world.
+
 ## 1.2.1 · 26 October 2026
 
 ### Fixed

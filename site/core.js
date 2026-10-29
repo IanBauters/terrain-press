@@ -55,10 +55,18 @@
       }
       const fullPxKm = (2 * Math.PI * R) / m.w;
       const ovPxKm = (2 * Math.PI * R) / m.ovw;
+      // live web tiles (Earth) when the global grid is too coarse for this region and we may be online
+      if (m.live && spacingKm < fullPxKm * 0.7) {
+        const live = liveSource(m, g, lat0, spacingKm);
+        if (live) return Object.assign(live, { grid: g, fallback: gridSource(m, body, g) });
+      }
       if (spacingKm > ovPxKm * 0.7) {
         return { kind: 'overview', grid: g, pxKm: ovPxKm, label: `${(m.ovw / 360).toFixed(1)} px/deg`, paths: [`data/${body}/overview.webp`] };
       }
-      const T = m.tile, set = new Set();
+      return gridSource(m, body, g);
+    }
+    function gridSource(m, body, g) {
+      const T = m.tile, set = new Set(), fullPxKm = (2 * Math.PI * m.radiusKm) / m.w;
       for (let k = 0; k < g.lats.length; k++) {
         const fy = (90 - g.lats[k]) / 180 * m.h - 0.5, fx = (g.lons[k] + 180) / 360 * m.w - 0.5;
         for (const yy of [Math.floor(fy), Math.floor(fy) + 1]) for (const xx of [Math.floor(fx), Math.floor(fx) + 1]) {
@@ -68,11 +76,39 @@
       }
       return { kind: 'tiles', grid: g, pxKm: fullPxKm, label: `${(m.w / 360).toFixed(1)} px/deg`, paths: [...set].map(s => `data/${body}/t${s}.webp`) };
     }
+    // Web Mercator tiles (256 px, terrarium encoding), at the zoom whose pixels match the sample spacing
+    function liveSource(m, g, lat0, spacingKm) {
+      const L = m.live, R = 6378.137;
+      for (let k = 0; k < g.lats.length; k += 7) if (Math.abs(g.lats[k]) > 85) return null;
+      const want = 2 * Math.PI * R * Math.cos(lat0 * Math.PI / 180) / (256 * spacingKm);
+      for (let z = Math.max(0, Math.min(L.maxZoom, Math.ceil(Math.log2(want)))); z >= 1; z--) {
+        const n = 2 ** z, set = new Set();
+        for (let k = 0; k < g.lats.length; k++) {
+          const [fx, fy] = merc(g.lats[k], g.lons[k], z);
+          for (const yy of [Math.floor(fy - 0.5), Math.floor(fy + 0.5)]) for (const xx of [Math.floor(fx - 0.5), Math.floor(fx + 0.5)]) {
+            const y = Math.max(0, Math.min(n * 256 - 1, yy)), x = ((xx % (n * 256)) + n * 256) % (n * 256);
+            set.add(`${z}/${(x / 256) | 0}/${(y / 256) | 0}`);
+          }
+        }
+        if (set.size > (L.maxTiles || 48) && z > 1) continue;
+        const pxKm = 2 * Math.PI * R * Math.cos(lat0 * Math.PI / 180) / (256 * n);
+        return { kind: 'live', z, pxKm, label: L.name, paths: [...set].map(t => { const [zz, x, y] = t.split('/'); return L.url.replace('{z}', zz).replace('{x}', x).replace('{y}', y); }) };
+      }
+      return null;
+    }
     async function sample(body, lat0, lon0, sizeKm, N, onProgress) {
       const m = meta[body];
-      const src = chooseSource(body, lat0, lon0, sizeKm, N);
+      let src = chooseSource(body, lat0, lon0, sizeKm, N);
       let done = 0;
-      const arrays = await Promise.all(src.paths.map(p => get(p).then(a => { done++; onProgress && onProgress(done, src.paths.length); return a; })));
+      const load = s => Promise.all(s.paths.map(p => get(p).then(a => { done++; onProgress && onProgress(done, s.paths.length); return a; })));
+      let arrays;
+      if (src.kind === 'live') {
+        try { arrays = await load(src); }
+        catch (e) { // offline, or the tile server is down: use the global grid and say so
+          for (const p of src.paths) cache.delete(p);
+          src = Object.assign(src.fallback, { offline: true }); done = 0; arrays = await load(src);
+        }
+      } else arrays = await load(src);
       const byPath = new Map(src.paths.map((p, i) => [p, arrays[i]]));
       const out = new Float32Array(N * N);
       const { lats, lons } = src.grid;
@@ -85,6 +121,19 @@
           const lo = lons[k] < p.west ? lons[k] + 360 : lons[k];
           const fx = (lo - p.west) / (p.east - p.west) * W - 0.5;
           out[k] = bilinear(A, W, H, fx, fy, false);
+        }
+      } else if (src.kind === 'live') {
+        const byPath = new Map(src.paths.map((p, i) => [p, arrays[i]])), n = 2 ** src.z, Wp = n * 256, L = m.live;
+        const url = (x, y) => L.url.replace('{z}', src.z).replace('{x}', x).replace('{y}', y);
+        const px = (x, y) => {
+          y = Math.max(0, Math.min(Wp - 1, y)); x = ((x % Wp) + Wp) % Wp;
+          const a = byPath.get(url((x / 256) | 0, (y / 256) | 0));
+          return a ? a[(y % 256) * 256 + (x % 256)] : 0;
+        };
+        for (let k = 0; k < out.length; k++) {
+          const [fx0, fy0] = merc(lats[k], lons[k], src.z), fx = fx0 - 0.5, fy = fy0 - 0.5;
+          const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+          out[k] = (px(x0, y0) * (1 - tx) + px(x0 + 1, y0) * tx) * (1 - ty) + (px(x0, y0 + 1) * (1 - tx) + px(x0 + 1, y0 + 1) * tx) * ty;
         }
       } else if (src.kind === 'overview') {
         const A = arrays[0]; W = m.ovw; H = m.ovh;
@@ -113,6 +162,32 @@
       return (lat, lon) => bilinear(A, m.ovw, m.ovh, (lon + 180) / 360 * m.ovw - 0.5, (90 - lat) / 180 * m.ovh - 0.5, true);
     }
     return { sample, chooseSource, globeSampler };
+  }
+  // Replace lone spikes and pits: a pixel more than T metres away from the median of its 5 x 5 neighbourhood.
+  // Real peaks never stand that far above everything within two pixels; void-fill artefacts in web tiles do.
+  function despike(A, W, H, T) {
+    const fix = [], nb = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const v = A[y * W + x]; let s = 0, c = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue; const yy = y + dy, xx = x + dx;
+        if (yy >= 0 && yy < H && xx >= 0 && xx < W) { s += A[yy * W + xx]; c++; }
+      }
+      if (Math.abs(v - s / c) < T / 2) continue; // quick test first; the median only for suspects
+      nb.length = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const yy = y + dy, xx = x + dx; if (yy >= 0 && yy < H && xx >= 0 && xx < W) nb.push(A[yy * W + xx]);
+      }
+      nb.sort((a, b) => a - b); const med = nb[nb.length >> 1];
+      if (Math.abs(v - med) > T) fix.push(y * W + x, med);
+    }
+    for (let i = 0; i < fix.length; i += 2) A[fix[i]] = fix[i + 1];
+    return fix.length / 2;
+  }
+  // Web Mercator pixel position (256 px tiles) of a latitude/longitude at zoom z
+  function merc(lat, lon, z) {
+    const n = 256 * 2 ** z, f = lat * Math.PI / 180;
+    return [(lon + 180) / 360 * n, (1 - Math.log(Math.tan(f) + 1 / Math.cos(f)) / Math.PI) / 2 * n];
   }
   function bilinear(A, W, H, fx, fy, wrap) {
     const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
@@ -1132,5 +1207,5 @@
     return out;
   }
 
-  root.TPCore = { makeStore, buildModel, spreadPieces, stl, model3mf, zip, weld, shapeOutline };
+  root.TPCore = { despike, makeStore, buildModel, spreadPieces, stl, model3mf, zip, weld, shapeOutline };
 })(typeof self !== 'undefined' ? self : globalThis);

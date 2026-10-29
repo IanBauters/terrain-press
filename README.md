@@ -2,7 +2,7 @@
 
 **Turn real NASA elevation data into 3D-printable ornaments and jigsaw puzzles. Free, open source, no account, no paywall.**
 
-Pick a place on the Moon, Mars, Mercury, Ceres, Vesta, Venus or Pluto, choose a shape and a size, and download print-ready STL and 3MF files. Everything is computed in your browser from real spacecraft measurements; nothing is uploaded anywhere.
+Pick a place on Earth, the Moon, Mars, Mercury, Ceres, Vesta, Venus or Pluto, choose a shape and a size, and download print-ready STL and 3MF files. Everything is computed in your browser from real measurements; nothing is uploaded anywhere.
 
 **Use it now:** <https://ianbauters.github.io/terrain-press/>
 
@@ -25,7 +25,7 @@ There are services that charge per download for exactly this kind of file. The e
 - **A print guide (PDF) with every download**: settings, filament estimates and a page per print plate.
 - **Settings**: relief exaggeration, rim height, base thickness, clearances, three lettering styles and mesh detail.
 
-Landmarks are built in: every Apollo landing site, Mars landers and rovers from Viking to Perseverance, the Soviet Venus landers, Rheasilvia on Vesta, Sputnik Planitia on Pluto and more. Or click anywhere on the globe.
+Landmarks are built in: 41 places on Earth from the Matterhorn to the Challenger Deep, every Apollo landing site, Mars landers and rovers from Viking to Perseverance, the Soviet Venus landers, Rheasilvia on Vesta, Sputnik Planitia on Pluto and more. Or click anywhere on the globe.
 
 ## Run it yourself
 
@@ -45,7 +45,7 @@ Prefer Compose (Synology Container Manager → Project)? Use the [`docker-compos
 python3 -m http.server 8080 --directory site
 ```
 
-It works fully offline: all libraries and fonts are bundled.
+It works fully offline: all libraries, fonts and elevation data are bundled. The one exception is fine detail on Earth: for small places the browser loads open elevation tiles from Amazon (AWS Terrain Tiles), which tells Amazon roughly which area you're looking at. Offline, Earth falls back to its bundled global grid (about 5 km per sample) and says so.
 
 ## Developing
 
@@ -70,6 +70,6 @@ Terrain Press is © Ian Bauters and contributors, licensed under the **GNU AGPL-
 - If you run a modified version as a public website, you must publish your source code too.
 - Files you make with it are yours, and the underlying data is public domain.
 
-Elevation data comes from NASA, the USGS Astrogeology Science Center, DLR and the NASA Planetary Data System. Libraries and fonts are under MIT, BSD, Boost and SIL OFL licences. Full details are in [CREDITS.md](CREDITS.md) and [LICENSES/](LICENSES).
+Elevation data comes from NOAA, NASA, the USGS Astrogeology Science Center, DLR and the NASA Planetary Data System; Earth's fine detail from AWS Terrain Tiles. Libraries and fonts are under MIT, BSD, Boost and SIL OFL licences. Full details are in [CREDITS.md](CREDITS.md) and [LICENSES/](LICENSES).
 
-This is a decorative representation, not survey-grade data, and is not endorsed by NASA, the USGS or DLR.
+This is a decorative representation, not survey-grade data, and is not endorsed by NOAA, NASA, the USGS or DLR.

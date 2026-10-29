@@ -36,12 +36,14 @@
   --tp-accent: #d6ccb2; --tp-accent-ink: #15130e; --tp-accent-soft: rgba(214, 204, 178, .14); color-scheme: dark }
 :root[data-bs-theme="light"] { color-scheme: light }
 /* world accents, light then dark */
+body[data-world="earth"] { --tp-accent: #2f6d9e; --tp-accent-soft: rgba(47, 109, 158, .13) }
 body[data-world="mars"] { --tp-accent: #b4522a; --tp-accent-soft: rgba(180, 82, 42, .13) }
 body[data-world="mercury"] { --tp-accent: #7a6a52; --tp-accent-soft: rgba(122, 106, 82, .14) }
 body[data-world="ceres"] { --tp-accent: #56657a; --tp-accent-soft: rgba(86, 101, 122, .14) }
 body[data-world="vesta"] { --tp-accent: #6e675b; --tp-accent-soft: rgba(110, 103, 91, .14) }
 body[data-world="venus"] { --tp-accent: #a3621f; --tp-accent-soft: rgba(163, 98, 31, .13) }
 body[data-world="pluto"] { --tp-accent: #94604a; --tp-accent-soft: rgba(148, 96, 74, .13) }
+[data-bs-theme="dark"] body[data-world="earth"] { --tp-accent: #7fb3dc; --tp-accent-ink: #0a131b; --tp-accent-soft: rgba(127, 179, 220, .15) }
 [data-bs-theme="dark"] body[data-world="mars"] { --tp-accent: #e0834f; --tp-accent-ink: #1a0d07; --tp-accent-soft: rgba(224, 131, 79, .15) }
 [data-bs-theme="dark"] body[data-world="mercury"] { --tp-accent: #c4b394; --tp-accent-ink: #17140f; --tp-accent-soft: rgba(196, 179, 148, .15) }
 [data-bs-theme="dark"] body[data-world="ceres"] { --tp-accent: #a9b7c9; --tp-accent-ink: #0f1318; --tp-accent-soft: rgba(169, 183, 201, .15) }
@@ -164,7 +166,7 @@ body { background: var(--tp-bg); color: var(--tp-ink); --bs-body-bg: var(--tp-bg
       <div class="row g-2">
         <div class="col-4"><label class="tp-label" for="lat">Latitude °</label><input class="form-control form-control-sm tp-num" id="lat" type="number" step="0.01" min="-90" max="90"></div>
         <div class="col-4"><label class="tp-label" for="lon">Longitude °E</label><input class="form-control form-control-sm tp-num" id="lon" type="number" step="0.01" min="-180" max="180"></div>
-        <div class="col-4"><label class="tp-label" for="size">Width km</label><input class="form-control form-control-sm tp-num" id="size" type="number" step="1" min="10" max="9000"></div>
+        <div class="col-4"><label class="tp-label" for="size">Width km</label><input class="form-control form-control-sm tp-num" id="size" type="number" step="1" min="2" max="9000"></div>
       </div>
       <p class="tp-hint" id="where-hint">Open the <b>Globe</b> tab to pick any spot; the dots are landing sites.</p>
     </section>
